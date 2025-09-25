@@ -4,14 +4,21 @@ export const path = {
   LOGIN: 'login',
   PUBLIC: 'public',
 
-  // COMMON USER
+  // COMMON USER  
 
   // INSTRUCTOR
   PUBLIC_INSTRUCTOR: 'instructor',
-  COURSE: 'course',
-  UPLOAD_COURSE: 'upload-course',
-  STUDENT: 'student',
-  CHAT: 'chat',
+  INSTRUCTOR_COURSE: 'course',
+  INSTRUCTOR_UPLOAD_COURSE: 'upload-course',
+  INSTRUCTOR_LEARNER: 'learner',
+  INSTRUCTOR_CHAT: 'chat',
+
+  // ADMIN
+  PUBLIC_ADMIN: 'admin',
+  ADMIN_COURSE_MANAGEMENT: 'course-management',
+  ADMIN_LEARNER_MANAGEMENT: 'learner-management',
+  ADMIN_INSTRUCTOR_MANAGEMENT: 'instructor-management',
+  ADMIN_REPORT: 'report',
 };
 
 export default path;

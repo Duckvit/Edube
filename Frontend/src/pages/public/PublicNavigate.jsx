@@ -6,7 +6,11 @@ import { Modal, Form, Input, Button, Checkbox, Radio } from "antd";
 import { MailOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
 import path from "../../utils/path";
 
-export const PublicNavigate = ({ openSignIn, openSignUp, onCloseSignInSignUp }) => {
+export const PublicNavigate = ({
+  openSignIn,
+  openSignUp,
+  onCloseSignInSignUp,
+}) => {
   const [form] = Form.useForm();
   const [showSignIn, setShowSignIn] = useState(false);
   const [showSignUp, setShowSignUp] = useState(false);
@@ -34,9 +38,12 @@ export const PublicNavigate = ({ openSignIn, openSignUp, onCloseSignInSignUp }) 
         setLoading(false);
         setShowSignIn(false);
 
-        if (email === "a@gmail.com" && password === "123") {
+        if (email === "i@gmail.com" && password === "123") {
           toast.success("Login successfully!");
           navigate(path.PUBLIC_INSTRUCTOR);
+        } else if (email === "a@gmail.com" && password === "123") {
+          toast.success("Login successfully!");
+          navigate(path.PUBLIC_ADMIN);
         } else {
           toast.error("Login failed!");
           console.log("Email or password incorrect!");
@@ -65,10 +72,12 @@ export const PublicNavigate = ({ openSignIn, openSignUp, onCloseSignInSignUp }) 
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+            {/* <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
               <Brain className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+            </div> */}
+
+            <img src="FIB_logo.png" className="object-cover h-[5vh]" />
+            <span className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent">
               Edube
             </span>
           </div>
@@ -138,10 +147,10 @@ export const PublicNavigate = ({ openSignIn, openSignUp, onCloseSignInSignUp }) 
           }}
         >
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <Brain className="w-8 h-8 text-white" />
+            <div className="w-16 h-16rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <img src="FIB_logo.png" className="object-cover h-[5vh]" />
             </div>
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-600 bg-clip-text text-transparent mb-2">
               Welcome Back
             </h2>
             <p className="text-gray-600">
@@ -197,7 +206,7 @@ export const PublicNavigate = ({ openSignIn, openSignUp, onCloseSignInSignUp }) 
                 htmlType="submit"
                 loading={loading}
                 size="large"
-                className="w-full h-12 !bg-gradient-to-r !from-purple-600 !to-blue-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-purple-700 hover:!to-blue-700 !text-white"
+                className="w-full h-12 !bg-gradient-to-r !from-blue-600 !to-blue-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-blue-700 hover:!to-blue-700 !text-white"
               >
                 Sign In
               </Button>

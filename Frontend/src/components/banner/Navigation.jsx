@@ -138,12 +138,12 @@ const Navigation = ({ children, menuNavbar }) => {
       >
         {/* Logo */}
         <div className="h-[8vh] flex items-center justify-center py-[1vh] bg-gray-200 ">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-            <Brain className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 flex items-center justify-center">
+            <img src="/FIB_logo.png" className="object-cover h-[3vh]" />
           </div>
 
           {!collapsed && (
-            <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+            <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent">
               Edube
             </span>
           )}
@@ -153,7 +153,7 @@ const Navigation = ({ children, menuNavbar }) => {
           className="h-[92vh] w-full flex flex-col gap-1 text-white font-semibold overflow-auto"
           mode="inline"
           items={menuNavbar}
-          theme="light"
+          theme={role === "ADMIN" ? "dark" : "light"}
         />
       </Sider>
 

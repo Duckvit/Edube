@@ -73,15 +73,11 @@ export const UploadCourse = () => {
     }
   };
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 m-2">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">
           Upload Course Videos
         </h2>
-        <button className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:from-purple-700 hover:to-blue-700 transition-all">
-          <Plus className="w-4 h-4" />
-          <span>New Course</span>
-        </button>
       </div>
 
       {/* Upload Area */}

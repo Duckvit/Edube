@@ -49,9 +49,9 @@ export const HomePage = () => {
         onCloseSignInSignUp={handleCloseSignInSignUp}
       />
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-yellow-900 overflow-hidden">
+      <section section id="platform" className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-900 via-sky-800 to-yellow-900 overflow-hidden">
         <div className="absolute inset-0 bg-black/20"></div>
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10"></div>
+        {/* <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10"></div> */}
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="max-w-4xl mx-auto">
@@ -97,7 +97,7 @@ export const HomePage = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <button
                 onClick={() => setOpenSignUp(true)}
-                className="cursor-pointer bg-gradient-to-r from-blue-600 to-yellow-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-yellow-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                className="cursor-pointer bg-gradient-to-r from-sky-600 to-yellow-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-yellow-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
                 Start Now
               </button>
@@ -107,10 +107,10 @@ export const HomePage = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-white">
+      <section id="features" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-4">
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-sky-600 to-sky-600 bg-clip-text text-transparent mb-4">
               Why Choose Edube?
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
@@ -121,7 +121,7 @@ export const HomePage = () => {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div className="text-center p-6 rounded-xl bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-100">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-r from-sky-600 to-yellow-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
                 <Brain className="w-6 h-6 text-white" />
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-3">
@@ -138,7 +138,7 @@ export const HomePage = () => {
             </div>
 
             <div className="text-center p-6 rounded-xl bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-100">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-r from-sky-600 to-yellow-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
                 <BookOpen className="w-6 h-6 text-white" />
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-3">
@@ -155,7 +155,7 @@ export const HomePage = () => {
             </div>
 
             <div className="text-center p-6 rounded-xl bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-100">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-r from-sky-600 to-yellow-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
                 <Target className="w-6 h-6 text-white" />
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-3">
@@ -175,10 +175,10 @@ export const HomePage = () => {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-20 bg-gray-50">
+      <section id="how-it-works" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-4">
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-sky-600 to-sky-600 bg-clip-text text-transparent mb-4">
               How Edube Works
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
@@ -189,7 +189,7 @@ export const HomePage = () => {
           <div className="grid md:grid-cols-3 gap-8">
             {steps.map((step, index) => (
               <div key={index} className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center text-white text-xl font-bold mx-auto mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-sky-600 to-yellow-600 rounded-full flex items-center justify-center text-white text-xl font-bold mx-auto mb-6">
                   {step.number}
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">

@@ -2,7 +2,7 @@ import React from "react";
 
 export const PublicFooter = () => {
   return (
-     <footer className="bg-gradient-to-r from-purple-900 to-blue-900 text-white ">
+     <footer className="bg-gradient-to-r from-sky-900 to-yellow-900 text-white ">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
           <h3 className="text-xl font-bold mb-2">Edube</h3>

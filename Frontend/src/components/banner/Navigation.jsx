@@ -16,7 +16,7 @@ import {
 } from "@ant-design/icons";
 import { useUserStore } from "../../store/useUserStore";
 
-const Navigation = ({ children, menuNavbar }) => {
+const Navigation = ({ children, menuNavbar, showSidebar = true }) => {
   const { Header, Sider } = Layout;
   const { IoIosNotifications } = icons;
   const [notificationCount, setNotificationCount] = useState(3);
@@ -127,76 +127,83 @@ const Navigation = ({ children, menuNavbar }) => {
 
   return (
     <Layout className="bg-gray-300 flex w-3/5 h-screen ">
-      {/* Vertical Sidebar */}
-      <Sider
-        trigger={null}
-        collapsible
-        collapsed={collapsed}
-        // theme="dark"
-        className="shadow-lg bg-gray-200 text-white"
-        // width={250}
-      >
-        {/* Logo */}
-        <div className="h-[8vh] flex items-center justify-center py-[1vh] bg-gray-200 ">
-          <div className="w-10 h-10 flex items-center justify-center">
-            <img src="/FIB_logo.png" className="object-cover h-[3vh]" />
-          </div>
+      {showSidebar && (
+        <>
+          {/* Vertical Sidebar */}
+          <Sider
+            trigger={null}
+            collapsible
+            collapsed={collapsed}
+            // theme="dark"
+            className="shadow-lg bg-gray-200 text-white"
+            // width={250}
+          >
+            {/* Logo */}
+            <div className="h-[8vh] flex items-center justify-center py-[1vh] bg-gray-200 ">
+              <div className="w-10 h-10 flex items-center justify-center">
+                <img src="/FIB_logo.png" className="object-cover h-[3vh]" />
+              </div>
 
-          {!collapsed && (
-            <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent">
-              Edube
-            </span>
-          )}
-        </div>
-
-        <Menu
-          className="h-[92vh] w-full flex flex-col gap-1 text-white font-semibold overflow-auto"
-          mode="inline"
-          items={menuNavbar}
-          theme={role === "ADMIN" ? "dark" : "light"}
-        />
-      </Sider>
+              {!collapsed && (
+                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent">
+                  Edube
+                </span>
+              )}
+            </div>
+            <Menu
+              className="h-[92vh] w-full flex flex-col gap-1 text-white font-semibold overflow-auto"
+              mode="inline"
+              items={menuNavbar}
+              theme={role === "ADMIN" ? "dark" : "light"}
+            />
+          </Sider>
+        </>
+      )}
 
       <Layout className="relative">
         {/* Top Header */}
         <Header
           style={{ backgroundColor: "#e5e7eb" }}
-          // className="fixed top-0 left-[250px] right-0 h-[64px] flex items-center justify-between shadow-sm z-50"
           className="bg-gray-200 p-0 flex items-center !h-[8vh] justify-between"
         >
+          {/* Logo khi sidebar ẩn */}
+          {!showSidebar && (
+            <div className="flex items-center gap-2 pl-4">
+              <img src="/FIB_logo.png" className="object-cover h-[3vh]" />
+              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent">
+                Edube
+              </span>
+            </div>
+          )}
+
           {/* Collapse Button */}
-          <Button
-            type="text"
-            size="20"
-            onClick={() => setCollapsed(!collapsed)}
-            icon={
-              collapsed ? (
-                <MenuUnfoldOutlined style={{ fontSize: 25 }} />
-              ) : (
-                <MenuFoldOutlined style={{ fontSize: 25 }} />
-              )
-            }
-          />
+          {showSidebar && (
+            <Button
+              type="text"
+              size="20"
+              onClick={() => setCollapsed(!collapsed)}
+              icon={
+                collapsed ? (
+                  <MenuUnfoldOutlined style={{ fontSize: 25 }} />
+                ) : (
+                  <MenuFoldOutlined style={{ fontSize: 25 }} />
+                )
+              }
+            />
+          )}
 
           {/* User Menu */}
           <div className="flex gap-5 pr-[2rem] items-center">
-            <div className="flex items-center gap-2 ">
-              <Dropdown menu={{ items }} placement="bottomRight" arrow>
-                {/* <Button type="text" className="flex items-center gap-2 h-auto">
-                <Avatar size="small" icon={<UserOutlined />} />
-                {!collapsed && <span>User</span>}
-              </Button> */}
-                <Space>
-                  <Avatar
-                    // src={userData?.user?.avatar}
-                    icon={<UserOutlined />}
-                    alt="avatar"
-                    className="object-cover h-[6vh] w-[6vh] rounded-full cursor-pointer"
-                  />
-                  <CaretDownOutlined />
-                </Space>
-              </Dropdown>
-            </div>
+            <Dropdown menu={{ items }} placement="bottomRight" arrow>
+              <Space>
+                <Avatar
+                  icon={<UserOutlined />}
+                  alt="avatar"
+                  className="object-cover h-[6vh] w-[6vh] rounded-full cursor-pointer"
+                />
+                <CaretDownOutlined />
+              </Space>
+            </Dropdown>
           </div>
         </Header>
 

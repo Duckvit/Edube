@@ -19,6 +19,10 @@ export const path = {
   ADMIN_LEARNER_MANAGEMENT: 'learner-management',
   ADMIN_INSTRUCTOR_MANAGEMENT: 'instructor-management',
   ADMIN_REPORT: 'report',
+
+  // LEARNER
+  PUBLIC_LEARNER: 'learner',
+  LEARNER_COURSE_DETAIL: 'course-detail/:id'
 };
 
 export default path;

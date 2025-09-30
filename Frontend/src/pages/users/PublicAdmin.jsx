@@ -7,7 +7,7 @@ import { Content } from "antd/es/layout/layout";
 export const PublicAdmin = () => {
   return (
     <div className="w-full flex-wrap flex justify-end">
-      <Navigation menuNavbar={menuNavbarItemsAdmin}>
+      <Navigation menuNavbar={menuNavbarItemsAdmin} showSidebar={true}>
         <Outlet />
       </Navigation>
     </div>

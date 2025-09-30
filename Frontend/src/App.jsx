@@ -2,7 +2,13 @@ import React, { useState, useEffect } from "react";
 import { ToastContainer } from "react-toastify";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { path } from "./utils/path";
-import { HomePage, PublicAdmin, PublicInstructor, PublicLayout } from "./pages";
+import {
+  HomePage,
+  PublicAdmin,
+  PublicInstructor,
+  PublicLayout,
+  PublicLearner,
+} from "./pages";
 import PrivateRoute from "./middlewares/PrivateRoute";
 import {
   AdminHome,
@@ -11,10 +17,12 @@ import {
   CourseManagement,
   Dashboard,
   InstructorManagement,
+  LearnerDashboard,
   LearnerManagement,
   Report,
-  Student,
+  Learner,
   UploadCourse,
+  CourseDetail,
 } from "./components";
 import { useUserStore } from "./store/useUserStore";
 import { roleForComponent } from "./utils/constant";
@@ -59,7 +67,7 @@ function App() {
             path={`${path.INSTRUCTOR_COURSE}/${path.INSTRUCTOR_UPLOAD_COURSE}`}
             element={<UploadCourse />}
           />
-          <Route path={path.INSTRUCTOR_LEARNER} element={<Student />} />
+          <Route path={path.INSTRUCTOR_LEARNER} element={<Learner />} />
           <Route path={path.INSTRUCTOR_CHAT} element={<Chat />} />
         </Route>
         <Route
@@ -85,6 +93,18 @@ function App() {
             element={<InstructorManagement />}
           />
           <Route path={path.REPORT} element={<Report />} />
+        </Route>
+        <Route
+          // Route cho trang learner
+          path={path.PUBLIC_LEARNER}
+          element={
+            // <PrivateRoute role={role}>
+            <PublicLearner />
+            // </PrivateRoute>
+          }
+        >
+          <Route index element={<LearnerDashboard />} />
+          <Route path={path.LEARNER_COURSE_DETAIL} element={<CourseDetail />} />
         </Route>
       </Routes>
     </div>

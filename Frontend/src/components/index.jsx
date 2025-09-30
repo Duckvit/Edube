@@ -12,8 +12,12 @@ export { default as InstructorManagement } from './admin/InstructorManagement';
 export { default as Report } from './admin/Report';
 
 // instructor
-export { default as Dashboard } from './instructor/Dashboard';
+export { default as Dashboard } from './instructor/InstructorDashboard';
 export { default as Course } from './instructor/Course';
 export { default as UploadCourse } from './instructor/UploadCourse';
-export { default as Student } from './instructor/Student';
+export { default as Learner } from './instructor/Learner';
 export { default as Chat } from './instructor/Chat';
+
+// learner
+export { default as LearnerDashboard } from './learner/LearnerDashboard';
+export { default as CourseDetail } from './learner/CourseDetail';

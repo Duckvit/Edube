@@ -49,7 +49,7 @@ export const HomePage = () => {
         onCloseSignInSignUp={handleCloseSignInSignUp}
       />
       {/* Hero Section */}
-      <section section id="platform" className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-900 via-sky-800 to-yellow-900 overflow-hidden">
+      <section id="platform" className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-900 via-sky-800 to-yellow-900 overflow-hidden">
         <div className="absolute inset-0 bg-black/20"></div>
         {/* <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10"></div> */}
 

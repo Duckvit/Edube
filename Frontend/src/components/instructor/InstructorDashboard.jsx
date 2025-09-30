@@ -31,7 +31,7 @@ export const Dashboard = () => {
   }, []);
 
   return (
-    <div className="bg-gray-100  rounded-lg shadow-lg m-2">
+    <div className="bg-gray-100 rounded-lg shadow-lg m-2">
       {loading && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-white bg-opacity-70">
           <Loading />

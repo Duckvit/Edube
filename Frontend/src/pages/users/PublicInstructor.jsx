@@ -7,7 +7,7 @@ import { Content } from "antd/es/layout/layout";
 export const PublicInstructor = () => {
   return (
     <div className="w-full flex-wrap flex justify-end">
-      <Navigation menuNavbar={menuNavbarItemsInstructor}>
+      <Navigation menuNavbar={menuNavbarItemsInstructor} showSidebar={true}>
         <Outlet />
       </Navigation>
     </div>

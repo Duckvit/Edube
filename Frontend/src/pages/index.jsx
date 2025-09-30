@@ -7,3 +7,4 @@ export { default as HomePage } from './public/HomePage';
 // users
 export { default as PublicInstructor } from './users/PublicInstructor';
 export { default as PublicAdmin } from './users/PublicAdmin';
+export { default as PublicLearner } from './users/PublicLearner';

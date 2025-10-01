@@ -55,7 +55,7 @@ instance.interceptors.response.use(
 
         setTimeout(() => {
           // Điều hướng người dùng về trang đăng nhập
-          window.location.href = '/public/login';
+          window.location.href = '/';
         }, 2000);
       }
     } else if (error.request) {

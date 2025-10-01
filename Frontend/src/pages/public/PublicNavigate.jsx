@@ -92,7 +92,7 @@ export const PublicNavigate = ({
 
       if (response && response.status === 200) {
         toast.success("Register Successful");
-        switchToSignIn;
+        switchToSignIn();
       } else if (response?.status === 400) {
         toast.error(response.data.message || "Login failed, please try again.");
       } else {
@@ -230,7 +230,7 @@ export const PublicNavigate = ({
                 ]}
               >
                 <Input
-                  id="login-username"
+                  id="loginUsername"
                   prefix={<UserOutlined className="mr-2" />}
                   placeholder="Username"
                   className="text-xl"
@@ -246,7 +246,7 @@ export const PublicNavigate = ({
                 ]}
               >
                 <Input.Password
-                  id="login-password"
+                  id="loginPassword"
                   prefix={<LockOutlined className="text-gray-400" />}
                   placeholder="Enter your password"
                   size="large"
@@ -348,7 +348,7 @@ export const PublicNavigate = ({
                   ]}
                 >
                   <Input
-                    id="register-username"
+                    id="registerUsername"
                     prefix={<UserOutlined className="text-gray-400" />}
                     placeholder="Enter your username"
                     className="rounded-xl"
@@ -389,7 +389,7 @@ export const PublicNavigate = ({
                   ]}
                 >
                   <Input.Password
-                    id="register-password"
+                    id="registerPassword"
                     prefix={<LockOutlined className="text-gray-400" />}
                     placeholder="Create a password"
                     className="rounded-xl"
@@ -415,7 +415,7 @@ export const PublicNavigate = ({
                   ]}
                 >
                   <Input.Password
-                    id="confirm-register-password"
+                    id="register-confirm-password"
                     prefix={<LockOutlined className="text-gray-400" />}
                     placeholder="Confirm your password"
                     className="rounded-xl"

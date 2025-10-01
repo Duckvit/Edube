@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useState } from "react";
 import { Button, Dropdown, Layout, Menu, Avatar, Space } from "antd";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import icons from "../../utils/icon";
 import path from "../../utils/path";
 import Swal from "sweetalert2";
@@ -17,6 +17,7 @@ import {
 import { useUserStore } from "../../store/useUserStore";
 
 const Navigation = ({ children, menuNavbar, showSidebar = true }) => {
+  const navigate = useNavigate();
   const { Header, Sider } = Layout;
   const { IoIosNotifications } = icons;
   const [notificationCount, setNotificationCount] = useState(3);
@@ -72,7 +73,7 @@ const Navigation = ({ children, menuNavbar, showSidebar = true }) => {
       if (result.isConfirmed) {
         // Nếu người dùng xác nhận đăng xuất
         resetUserStore(); // Gọi hàm reset trạng thái người dùng (đăng xuất)
-
+        navigate("/");
         // Hoặc hiển thị một thông báo thành công khác với SweetAlert2 (nếu muốn)
         Swal.fire({
           title: "Logged Out!",

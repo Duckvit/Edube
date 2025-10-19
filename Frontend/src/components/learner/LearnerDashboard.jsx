@@ -142,67 +142,72 @@ export const LearnerDashboard = () => {
           <Col xs={24} sm={12} lg={8} xl={6} key={course.key}>
             <Card
               hoverable
-              className="h-full"
+              className="h-full flex flex-col"
               cover={
                 <div className="h-40 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                   <BookOutlined style={{ fontSize: 48, color: "white" }} />
                 </div>
               }
-              actions={[
-                <Button
-                  type="primary"
-                  block
-                  className="bg-blue-600"
-                  onClick={() => handleContinueCourse(course.id)}
-                >
-                  {course.status === "completed"
-                    ? "Review"
-                    : course.status === "saved"
-                    ? "Start Learning"
-                    : "Continue"}
-                </Button>,
-              ]}
             >
-              <div className="mb-2">
-                <Tag
-                  color={getStatusColor(course.status)}
-                  icon={getStatusIcon(course.status)}
-                >
-                  {course.status.replace("-", " ").toUpperCase()}
-                </Tag>
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
-                {course.title}
-              </h3>
-              <p className="text-sm text-gray-600 mb-2">
-                by {course.instructor}
-              </p>
-              <div className="flex items-center mb-2">
-                <Rate
-                  disabled
-                  defaultValue={course.rating}
-                  allowHalf
-                  className="text-xs"
-                />
-                <span className="text-sm text-gray-600 ml-2">
-                  ({course.rating})
-                </span>
-              </div>
-              <div className="text-sm text-gray-600 mb-3">
-                {course.completedLessons}/{course.totalLessons} lessons •{" "}
-                {course.duration}
-              </div>
-              {course.status !== "saved" && (
+              <div className="flex flex-col h-full">
                 <div className="mb-2">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Progress</span>
-                    <span>{course.progress}%</span>
-                  </div>
-                  <Progress percent={course.progress} size="small" />
+                  <Tag
+                    color={getStatusColor(course.status)}
+                    icon={getStatusIcon(course.status)}
+                  >
+                    {course.status.replace("-", " ").toUpperCase()}
+                  </Tag>
                 </div>
-              )}
-              <div className="text-xs text-gray-500">
-                Last accessed: {course.lastAccessed}
+                <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
+                  {course.title}
+                </h3>
+                <p className="text-sm text-gray-600 mb-2">
+                  by {course.instructor}
+                </p>
+                <div className="flex items-center mb-2">
+                  <Rate
+                    disabled
+                    defaultValue={course.rating}
+                    allowHalf
+                    className="text-xs"
+                  />
+                  <span className="text-sm text-gray-600 ml-2">
+                    ({course.rating})
+                  </span>
+                </div>
+                <div className="text-sm text-gray-600 mb-3">
+                  {course.completedLessons}/{course.totalLessons} lessons •{" "}
+                  {course.duration}
+                </div>
+                <div className="mb-3" style={{ minHeight: "52px" }}>
+                  {course.status !== "saved" && (
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>Progress</span>
+                        <span>{course.progress}%</span>
+                      </div>
+                      <Progress percent={course.progress} size="small" />
+                    </div>
+                  )}
+                </div>
+                <div className="text-xs text-gray-500 mb-4">
+                  Last accessed: {course.lastAccessed}
+                </div>
+                <div className="mt-auto">
+                  <Button
+                    type="primary"
+                    block
+                    size="large"
+                    className="bg-blue-600 font-medium"
+                    onClick={() => handleContinueCourse(course.id)}
+                  >
+                    {course.status === "completed"
+                      ? "Review"
+                      : course.status === "saved"
+                      ? "Start Learning"
+                      : "Continue"}
+                  </Button>
+                </div>
               </div>
             </Card>
           </Col>
@@ -274,10 +279,10 @@ export const LearnerDashboard = () => {
           <Col xs={24} sm={12} lg={8} xl={6} key={course.key}>
             <Card
               hoverable
-              className="h-full"
+              className="h-full flex flex-col"
               cover={
                 <div className="h-40 bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center relative">
-                  <BookOutlined style={{ fontSize: 48, color: "white" }} />
+                  <BookOutlined style={{ fontSize: 48, color: 'white' }} />
                   {course.enrolled && (
                     <div className="absolute top-2 right-2">
                       <Tag color="green" icon={<CheckCircleOutlined />}>
@@ -287,53 +292,46 @@ export const LearnerDashboard = () => {
                   )}
                 </div>
               }
-              actions={[
-                <Button
-                  type={course.enrolled ? "default" : "primary"}
-                  block
-                  className={course.enrolled ? "" : "bg-blue-600"}
-                >
-                  {course.enrolled
-                    ? "Go to Course"
-                    : `Enroll - $${course.price}`}
-                </Button>,
-              ]}
             >
-              <div className="mb-2">
-                <Tag color="blue">{course.category}</Tag>
-                <Tag color="orange">{course.level}</Tag>
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
-                {course.title}
-              </h3>
-              <p className="text-sm text-gray-600 mb-2">
-                by {course.instructor}
-              </p>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center">
-                  <Rate
-                    disabled
-                    defaultValue={course.rating}
-                    allowHalf
-                    className="text-xs"
-                  />
-                  <span className="text-sm text-gray-600 ml-2">
-                    ({course.rating})
-                  </span>
+              <div className="flex flex-col h-full">
+                <div className="mb-2">
+                  <Tag color="blue">{course.category}</Tag>
+                  <Tag color="orange">{course.level}</Tag>
                 </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <UserOutlined className="mr-1" />
-                  {course.students.toLocaleString()}
+                <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{course.title}</h3>
+                <p className="text-sm text-gray-600 mb-2">by {course.instructor}</p>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <Rate disabled defaultValue={course.rating} allowHalf className="text-xs" />
+                    <span className="text-sm text-gray-600 ml-2">({course.rating})</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <UserOutlined className="mr-1" />
+                    {course.students.toLocaleString()}
+                  </div>
+                </div>
+                <div className="text-sm text-gray-600 mb-3">
+                  {course.lessons} lessons • {course.duration}
+                </div>
+                <div className="mb-4" style={{ minHeight: '28px' }}>
+                  {!course.enrolled && (
+                    <div className="text-lg font-bold text-green-600">
+                      ${course.price}
+                    </div>
+                  )}
+                </div>
+                <div className="mt-auto">
+                  <Button
+                    type={course.enrolled ? 'default' : 'primary'}
+                    block
+                    size="large"
+                    className={course.enrolled ? 'font-medium' : 'bg-blue-600 font-medium'}
+                    onClick={() => course.enrolled && handleContinueCourse(course.id)}
+                  >
+                    {course.enrolled ? 'Go to Course' : `Enroll - $${course.price}`}
+                  </Button>
                 </div>
               </div>
-              <div className="text-sm text-gray-600 mb-2">
-                {course.lessons} lessons • {course.duration}
-              </div>
-              {!course.enrolled && (
-                <div className="text-lg font-bold text-green-600">
-                  ${course.price}
-                </div>
-              )}
             </Card>
           </Col>
         ))}

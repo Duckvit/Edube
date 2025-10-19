@@ -45,7 +45,7 @@ export const menuNavbarItemsInstructor = [
     key: "chat",
     icon: <MessageOutlined />,
     label: (
-      <NavLink to={path.INSTRUCTOR_CHAT} className="text-white">
+      <NavLink to={path.USER_CHAT} className="text-white">
         Chat
       </NavLink>
     ),

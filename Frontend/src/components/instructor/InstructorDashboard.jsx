@@ -104,7 +104,7 @@ export const Dashboard = () => {
                 Revenue Earned
               </p>
               <p className="text-3xl font-bold text-gray-900">
-                ${stats?.revenue}
+                {stats?.revenue}
               </p>
               <p className="text-sm text-green-600 flex items-center mt-1">
                 <TrendingUp className="w-4 h-4 mr-1" />

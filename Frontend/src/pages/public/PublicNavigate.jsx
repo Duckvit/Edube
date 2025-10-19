@@ -71,6 +71,7 @@ export const PublicNavigate = ({
       const response = await UserLogin(values);
       setLoading(false);
       if (response?.data?.token) {
+        localStorage.setItem("token", response.data.token);
         navigate("/learner");
         toast.success("Login Successful");
       } else if (response?.status === 400) {
@@ -137,9 +138,12 @@ export const PublicNavigate = ({
               alt="Logo"
               className="object-cover h-[5vh]"
             />
-            <span className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent">
+            <a
+              href="/"
+              className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent"
+            >
               Edube
-            </span>
+            </a>
           </div>
 
           {/* Navigation */}
@@ -259,7 +263,7 @@ export const PublicNavigate = ({
                 <Checkbox>Remember me</Checkbox>
               </Form.Item> */}
                 <a
-                  href="#"
+                  href="/forgot-password"
                   className="text-blue-600 hover:text-blue-700 text-sm"
                 >
                   Forgot password?

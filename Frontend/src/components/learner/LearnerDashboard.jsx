@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { enrolledCourses, allCourses } from "../../utils/mockData";
+import { useCourseStore } from '../../store/useCourseStore';
 import {
   Card,
   Tabs,
@@ -41,6 +41,8 @@ export const LearnerDashboard = () => {
   const [searchText, setSearchText] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
+  const allCourses = useCourseStore((s) => s.allCourses);
+  const enrolledCourses = useCourseStore((s) => s.enrolledCourses);
 
   const handleContinueCourse = (courseId) => {
     navigate(`/learner/course-detail/${courseId}`);
@@ -192,15 +194,17 @@ export const LearnerDashboard = () => {
                 {course.completedLessons}/{course.totalLessons} lessons •{" "}
                 {course.duration}
               </div>
-              {course.status !== "saved" && (
-                <div className="mb-2">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Progress</span>
-                    <span>{course.progress}%</span>
-                  </div>
-                  <Progress percent={course.progress} size="small" />
+              {/* {course.status !== "saved" &&  */}
+              {/* ( */}
+              <div className="mb-2">
+                <div className="flex justify-between text-sm mb-1">
+                  <span>Progress</span>
+                  <span>{course.progress}%</span>
                 </div>
-              )}
+                <Progress percent={course.progress} size="small" />
+              </div>
+              {/* ) */}
+              {/* } */}
               <div className="text-xs text-gray-500">
                 Last accessed: {course.lastAccessed}
               </div>
@@ -292,6 +296,13 @@ export const LearnerDashboard = () => {
                   type={course.enrolled ? "default" : "primary"}
                   block
                   className={course.enrolled ? "" : "bg-blue-600"}
+                  onClick={() => {
+                    if (course.enrolled) {
+                      navigate(`/learner/course-detail/${course.id}`);
+                    } else {
+                      navigate(`/learner/course-preview/${course.id}`);
+                    }
+                  }}
                 >
                   {course.enrolled
                     ? "Go to Course"
@@ -332,6 +343,12 @@ export const LearnerDashboard = () => {
               {!course.enrolled && (
                 <div className="text-lg font-bold text-green-600">
                   ${course.price}
+                </div>
+              )}
+              {course.enrolled && (
+                <div className="text-lg font-bold text-green-600">
+                  &nbsp;
+                  {/* {course.price} */}
                 </div>
               )}
             </Card>

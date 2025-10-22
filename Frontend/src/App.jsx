@@ -23,6 +23,8 @@ import {
   Learner,
   UploadCourse,
   CourseDetail,
+  CoursePreview,
+  PaymentPage,
 } from "./components";
 import { useUserStore } from "./store/useUserStore";
 import { roleForComponent } from "./utils/constant";
@@ -105,6 +107,11 @@ function App() {
         >
           <Route index element={<LearnerDashboard />} />
           <Route path={path.LEARNER_COURSE_DETAIL} element={<CourseDetail />} />
+          <Route
+            path={path.LEARNER_COURSE_PREVIEW}
+            element={<CoursePreview />}
+          />
+          <Route path={path.LEARNER_PAYMENT} element={<PaymentPage />} />
         </Route>
       </Routes>
     </div>

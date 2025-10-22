@@ -25,6 +25,8 @@ import {
   Report,
   Learner,
   CourseDetail,
+  CoursePreview,
+  PaymentPage,
   UserProfile,
   CourseBuilder,
   UploadLesson,
@@ -135,7 +137,11 @@ function App() {
         >
           <Route index element={<LearnerDashboard />} />
           <Route path={path.LEARNER_COURSE_DETAIL} element={<CourseDetail />} />
-          <Route path={path.USER_PROFILE} element={<UserProfile />} />
+          <Route
+            path={path.LEARNER_COURSE_PREVIEW}
+            element={<CoursePreview />}
+          />
+          <Route path={path.LEARNER_PAYMENT} element={<PaymentPage />} />
         </Route>
       </Routes>
     </div>

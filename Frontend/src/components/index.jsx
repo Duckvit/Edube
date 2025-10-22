@@ -24,3 +24,7 @@ export { default as Learner } from "./mentor/Learner";
 // learner
 export { default as LearnerDashboard } from "./learner/LearnerDashboard";
 export { default as CourseDetail } from "./learner/CourseDetail";
+export { default as CoursePreview } from "./learner/CoursePreview";
+export { default as PaymentPage } from "./learner/PaymentPage";
+//export { default as CoursePreview } from './learner/CoursePreview';
+//export { default as PaymentPage } from './learner/PaymentPage';

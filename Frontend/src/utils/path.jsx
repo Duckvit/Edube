@@ -28,6 +28,8 @@ export const path = {
   // LEARNER
   PUBLIC_LEARNER: "learner",
   LEARNER_COURSE_DETAIL: "course-detail/:id",
+  LEARNER_COURSE_PREVIEW: "course-preview/:id",
+  LEARNER_PAYMENT: "payment/:id",
 };
 
 export default path;

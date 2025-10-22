@@ -3,9 +3,12 @@ import { ToastContainer } from "react-toastify";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { path } from "./utils/path";
 import {
+  ChangePass,
+  ForgotPass,
   HomePage,
+  OTPInput,
   PublicAdmin,
-  PublicInstructor,
+  PublicMentor,
   PublicLayout,
   PublicLearner,
 } from "./pages";
@@ -16,25 +19,44 @@ import {
   Course,
   CourseManagement,
   Dashboard,
-  InstructorManagement,
+  MentorManagement,
   LearnerDashboard,
   LearnerManagement,
   Report,
   Learner,
-  UploadCourse,
   CourseDetail,
   CoursePreview,
   PaymentPage,
+  UserProfile,
+  CourseBuilder,
+  UploadLesson,
 } from "./components";
 import { useUserStore } from "./store/useUserStore";
 import { roleForComponent } from "./utils/constant";
+import { getProfile } from './apis/UserServices';
+import { parseJwt } from './utils/jwt'
 
 function App() {
   const [count, setCount] = useState(0);
-  const { token, role, resetUserStore } = useUserStore();
-  // useEffect(() => {
-  //   if (!localStorage?.getItem('token') || localStorage?.getItem('token') === 'null') resetUserStore();
-  // }, [useUserStore]);
+  const { token, userData, setUserData, role, resetUserStore } = useUserStore();
+  useEffect(() => {
+    if (
+      !localStorage?.getItem("token") ||
+      localStorage?.getItem("token") === "null"
+    )
+      resetUserStore();
+  }, [useUserStore]);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (token && !userData) {
+        const decoded = parseJwt(token); // lấy username từ token nếu có
+        const profile = await getProfile(decoded.sub);
+        setUserData(profile.user);
+      }
+    };
+    fetchProfile();
+  }, [token]);
 
   return (
     <div>
@@ -52,25 +74,33 @@ function App() {
         {/* Route cho trang public */}
         <Route element={<PublicLayout />}>
           <Route index element={<HomePage />} />
+          <Route path={path.FORGOT_PASS} element={<ForgotPass />} />
+          <Route path={path.OTP_INPUT} element={<OTPInput />} />
+          <Route path={path.CHANGE_PASS} element={<ChangePass />} />
         </Route>
 
         <Route
           // Route cho trang insctructor
-          path={path.PUBLIC_INSTRUCTOR}
+          path={path.PUBLIC_MENTOR}
           element={
             // <PrivateRoute role={role}>
-            <PublicInstructor />
+            <PublicMentor />
             // </PrivateRoute>
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path={path.INSTRUCTOR_COURSE} element={<Course />} />
+          <Route path={path.MENTOR_COURSE} element={<Course />} />
           <Route
-            path={`${path.INSTRUCTOR_COURSE}/${path.INSTRUCTOR_UPLOAD_COURSE}`}
-            element={<UploadCourse />}
+            path={`${path.MENTOR_COURSE_BUILDER}/${path.MENTOR_UPLOAD_LESSON}`}
+            element={<UploadLesson />}
           />
-          <Route path={path.INSTRUCTOR_LEARNER} element={<Learner />} />
-          <Route path={path.INSTRUCTOR_CHAT} element={<Chat />} />
+          <Route
+            path={path.MENTOR_COURSE_BUILDER}
+            element={<CourseBuilder />}
+          />
+          <Route path={path.MENTOR_LEARNER} element={<Learner />} />
+          <Route path={path.USER_CHAT} element={<Chat />} />
+          <Route path={path.USER_PROFILE} element={<UserProfile />} />
         </Route>
         <Route
           // Route cho trang admin
@@ -91,8 +121,8 @@ function App() {
             element={<LearnerManagement />}
           />
           <Route
-            path={path.ADMIN_INSTRUCTOR_MANAGEMENT}
-            element={<InstructorManagement />}
+            path={path.ADMIN_MENTOR_MANAGEMENT}
+            element={<MentorManagement />}
           />
           <Route path={path.REPORT} element={<Report />} />
         </Route>

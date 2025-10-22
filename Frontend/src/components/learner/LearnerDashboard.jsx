@@ -144,26 +144,12 @@ export const LearnerDashboard = () => {
           <Col xs={24} sm={12} lg={8} xl={6} key={course.key}>
             <Card
               hoverable
-              className="h-full"
+              className="h-full flex flex-col"
               cover={
                 <div className="h-40 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                   <BookOutlined style={{ fontSize: 48, color: "white" }} />
                 </div>
               }
-              actions={[
-                <Button
-                  type="primary"
-                  block
-                  className="bg-blue-600"
-                  onClick={() => handleContinueCourse(course.id)}
-                >
-                  {course.status === "completed"
-                    ? "Review"
-                    : course.status === "saved"
-                    ? "Start Learning"
-                    : "Continue"}
-                </Button>,
-              ]}
             >
               <div className="mb-2">
                 <Tag
@@ -278,10 +264,10 @@ export const LearnerDashboard = () => {
           <Col xs={24} sm={12} lg={8} xl={6} key={course.key}>
             <Card
               hoverable
-              className="h-full"
+              className="h-full flex flex-col"
               cover={
                 <div className="h-40 bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center relative">
-                  <BookOutlined style={{ fontSize: 48, color: "white" }} />
+                  <BookOutlined style={{ fontSize: 48, color: 'white' }} />
                   {course.enrolled && (
                     <div className="absolute top-2 right-2">
                       <Tag color="green" icon={<CheckCircleOutlined />}>
@@ -310,39 +296,25 @@ export const LearnerDashboard = () => {
                 </Button>,
               ]}
             >
-              <div className="mb-2">
-                <Tag color="blue">{course.category}</Tag>
-                <Tag color="orange">{course.level}</Tag>
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
-                {course.title}
-              </h3>
-              <p className="text-sm text-gray-600 mb-2">
-                by {course.instructor}
-              </p>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center">
-                  <Rate
-                    disabled
-                    defaultValue={course.rating}
-                    allowHalf
-                    className="text-xs"
-                  />
-                  <span className="text-sm text-gray-600 ml-2">
-                    ({course.rating})
-                  </span>
+              <div className="flex flex-col h-full">
+                <div className="mb-2">
+                  <Tag color="blue">{course.category}</Tag>
+                  <Tag color="orange">{course.level}</Tag>
                 </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <UserOutlined className="mr-1" />
-                  {course.students.toLocaleString()}
+                <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{course.title}</h3>
+                <p className="text-sm text-gray-600 mb-2">by {course.instructor}</p>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <Rate disabled defaultValue={course.rating} allowHalf className="text-xs" />
+                    <span className="text-sm text-gray-600 ml-2">({course.rating})</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <UserOutlined className="mr-1" />
+                    {course.students.toLocaleString()}
+                  </div>
                 </div>
-              </div>
-              <div className="text-sm text-gray-600 mb-2">
-                {course.lessons} lessons • {course.duration}
-              </div>
-              {!course.enrolled && (
-                <div className="text-lg font-bold text-green-600">
-                  ${course.price}
+                <div className="text-sm text-gray-600 mb-3">
+                  {course.lessons} lessons • {course.duration}
                 </div>
               )}
               {course.enrolled && (

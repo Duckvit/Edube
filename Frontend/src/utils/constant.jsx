@@ -10,12 +10,12 @@ import {
   LineChartOutlined,
 } from "@ant-design/icons";
 
-export const menuNavbarItemsInstructor = [
+export const menuNavbarItemsMentor = [
   {
     key: "dashboard",
     icon: <HomeOutlined />,
     label: (
-      <NavLink to={"/instructor"} className="text-white">
+      <NavLink to={"/mentor"} className="text-white">
         Dashboard
       </NavLink>
     ),
@@ -25,7 +25,7 @@ export const menuNavbarItemsInstructor = [
     key: "course",
     icon: <BookOutlined />,
     label: (
-      <NavLink to={path.INSTRUCTOR_COURSE} className="text-white">
+      <NavLink to={path.MENTOR_COURSE} className="text-white">
         Course
       </NavLink>
     ),
@@ -35,7 +35,7 @@ export const menuNavbarItemsInstructor = [
     key: "Learner",
     icon: <UserOutlined />,
     label: (
-      <NavLink to={path.INSTRUCTOR_LEARNER} className="text-white">
+      <NavLink to={path.MENTOR_LEARNER} className="text-white">
         Learner
       </NavLink>
     ),
@@ -45,7 +45,7 @@ export const menuNavbarItemsInstructor = [
     key: "chat",
     icon: <MessageOutlined />,
     label: (
-      <NavLink to={path.INSTRUCTOR_CHAT} className="text-white">
+      <NavLink to={path.USER_CHAT} className="text-white">
         Chat
       </NavLink>
     ),
@@ -68,7 +68,7 @@ export const menuNavbarItemsAdmin = [
     key: "user-management",
     icon: <TeamOutlined />,
     className: "text-white text-lg",
-    label: 'Users',
+    label: "Users",
     children: [
       // Đây là các mục con của Users
       {
@@ -81,11 +81,11 @@ export const menuNavbarItemsAdmin = [
         ),
       },
       {
-        key: "users-instructor",
+        key: "users-mentor",
         icon: <UserOutlined />,
         label: (
-          <NavLink to={path.ADMIN_INSTRUCTOR_MANAGEMENT} className="text-white">
-            Instructor
+          <NavLink to={path.ADMIN_MENTOR_MANAGEMENT} className="text-white">
+            Mentor
           </NavLink>
         ),
       },
@@ -115,6 +115,6 @@ export const menuNavbarItemsAdmin = [
 
 export const roleForComponent = {
   ADMIN: path.PUBLIC_ADMIN,
-  // LEARNER: path.PUBLIC_LEARNER,
-  INSTRUCTOR: path.PUBLIC_INSTRUCTOR,
+  LEARNER: path.PUBLIC_LEARNER,
+  MENTOR: path.PUBLIC_MENTOR,
 };

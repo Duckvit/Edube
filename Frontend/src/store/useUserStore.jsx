@@ -1,42 +1,43 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
-export const useUserStore = create(set => ({
-  token: localStorage.getItem('token') || null,
-  role: localStorage.getItem('role') || null,
+export const useUserStore = create((set) => ({
+  token: localStorage.getItem("token") || null,
+  role: localStorage.getItem("role") || null,
   // current: null,
-  isLoggedIn: localStorage.getItem('isLoggedIn') === 'true' || false,
+  isLoggedIn: localStorage.getItem("isLoggedIn") === "true" || false,
   userData: null,
   instructorOfCourse: null,
   fullData: null,
   email: null,
-  // otp: null,
+  username: null,
+  otp: null,
 
   setModal: (token, role, isLoggedIn) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('role', role);
-    localStorage.setItem('isLoggedIn', isLoggedIn ? 'true' : 'false');
+    localStorage.setItem("token", token);
+    localStorage.setItem("role", role);
+    localStorage.setItem("isLoggedIn", isLoggedIn ? "true" : "false");
     set(() => ({
       token,
       role,
-      isLoggedIn
+      isLoggedIn,
     }));
   },
 
-  setUserData: userData => {
+  setUserData: (userData) => {
     set(() => ({
-      userData
+      userData,
     }));
   },
 
-  setFullData: fullData => {
+  setFullData: (fullData) => {
     set(() => ({
-      fullData
+      fullData,
     }));
   },
 
-  setinstructorOfCourse: instructorOfCourse => {
+  setinstructorOfCourse: (instructorOfCourse) => {
     set(() => ({
-      instructorOfCourse
+      instructorOfCourse,
     }));
   },
 
@@ -44,17 +45,23 @@ export const useUserStore = create(set => ({
   //   set(() => ({ current }));
   // },
 
-  setEmail: email => {
+  setEmail: (email) => {
     set(() => ({
-      email
+      email,
     }));
   },
 
-  // setStoreOTP: otp => {
-  //   set(() => ({
-  //     otp
-  //   }));
-  // },
+  setStoreOTP: (otp) => {
+    set(() => ({
+      otp,
+    }));
+  },
+
+  setUsername: (username) => {
+    set(() => ({
+      username,
+    }));
+  },
 
   // resetChangePass: () => {
   //   set(() => ({
@@ -64,9 +71,9 @@ export const useUserStore = create(set => ({
   // },
 
   resetUserStore: () => {
-    localStorage?.removeItem('token');
-    localStorage?.removeItem('role');
-    localStorage?.removeItem('isLoggedIn');
+    localStorage?.removeItem("token");
+    localStorage?.removeItem("role");
+    localStorage?.removeItem("isLoggedIn");
     set(() => ({
       token: null,
       role: null,
@@ -77,7 +84,8 @@ export const useUserStore = create(set => ({
       // current: null,
       instructorOfCourse: null,
       email: null,
-      // otp: null
+      username: null,
+      otp: null,
     }));
-  }
+  },
 }));

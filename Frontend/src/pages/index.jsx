@@ -8,6 +8,6 @@ export { default as OTPInput } from './public/OTPInput';
 export { default as ChangePass } from './public/ChangePass';
 
 // users
-export { default as PublicInstructor } from './users/PublicInstructor';
+export { default as PublicMentor } from './users/PublicMentor';
 export { default as PublicAdmin } from './users/PublicAdmin';
 export { default as PublicLearner } from './users/PublicLearner';

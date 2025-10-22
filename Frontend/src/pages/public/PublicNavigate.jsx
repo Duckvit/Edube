@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
-import { useNavigate } from "react-router-dom";
-import { UserRegister, UserLogin } from "../../apis/UserServices";
-import { Modal, Form, Input, Button, Checkbox, Radio } from "antd";
+import { useLocation, useNavigate } from "react-router-dom";
+import { UserRegister, UserLogin, getProfile } from "../../apis/UserServices";
+import { Modal, Form, Input, Button, Divider, Checkbox, Radio } from "antd";
 import { MailOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
-import path from "../../utils/path";
+import { roleForComponent } from "../../utils/constant";
+import { useUserStore } from "../../store/useUserStore";
+import icons from "../../utils/icon";
 
 export const PublicNavigate = ({
   openSignIn,
@@ -19,8 +21,15 @@ export const PublicNavigate = ({
   const [loginForm] = Form.useForm();
   const [registerForm] = Form.useForm();
   const [scrollY, setScrollY] = useState(0);
+  const { setModal, role, resetUserStore } = useUserStore();
+  const { FcGoogle } = icons;
+  const location = useLocation();
 
   const navigate = useNavigate();
+
+  const handleLoginGoogle = () => {
+    window.location.href = "http://localhost:8080/oauth2/authorization/google";
+  };
 
   const handleCancel = () => {
     setShowSignIn(false);
@@ -65,15 +74,57 @@ export const PublicNavigate = ({
     setPayload(values);
   };
 
-  const handleLogin = async (values) => {
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const token = queryParams.get("token");
+    const role = queryParams.get("role");
+
+    // Kiểm tra nếu token không phải là null và hợp lệ
+    if (token && token !== "null" && role) {
+      setModal(token, role, true);
+      navigate(roleForComponent[role]);
+      toast.success("Login Successful");
+    } else if (token === "null") {
+      resetUserStore();
+      toast.error("Login Failed: Your email was not found");
+      window.history.replaceState({}, document.title, location.pathname);
+    }
+  }, [location.search, navigate, setModal, resetUserStore]);
+
+  const handleLogin = async () => {
+    const { setModal, setUserData } = useUserStore.getState();
+
+    if (!payload.username || !payload.password) {
+      toast.error("Username and password are required.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await UserLogin(values);
+      const response = await UserLogin(payload);
       setLoading(false);
+
       if (response?.data?.token) {
-        localStorage.setItem("token", response.data.token);
-        navigate("/learner");
-        toast.success("Login Successful");
+        const token = response.data.token;
+        const userRole = response.data.role;
+
+        // ✅ Lưu token + role vào localStorage & store
+        setModal(token, userRole, true);
+
+        // ✅ Gọi API lấy thông tin user
+        const profileRes = await getProfile(payload.username, token);
+        if (profileRes?.user) {
+          setUserData(profileRes.user); // Lưu vào Zustand
+        }
+
+        // ✅ Điều hướng theo role
+        const path = roleForComponent[userRole];
+        if (userRole && path) {
+          toast.success("Login successful!");
+          navigate(path);
+        } else {
+          toast.error("Invalid role.");
+        }
       } else if (response?.status === 400) {
         toast.error(response.data.message || "Login failed, please try again.");
       } else {
@@ -81,7 +132,9 @@ export const PublicNavigate = ({
       }
     } catch (error) {
       setLoading(false);
-      toast.error("An error occurred during login. Please check your network.");
+      toast.error(
+        "An error occurred during login. Please check your network connection."
+      );
     }
   };
 
@@ -217,7 +270,7 @@ export const PublicNavigate = ({
             <Form
               form={loginForm}
               layout="vertical"
-              onFinish={handleLogin}
+              // onFinish={handleLogin}
               initialValues={{
                 remember: true,
               }}
@@ -234,6 +287,7 @@ export const PublicNavigate = ({
                 ]}
               >
                 <Input
+                  name="username"
                   id="loginUsername"
                   prefix={<UserOutlined className="mr-2" />}
                   placeholder="Username"
@@ -250,6 +304,7 @@ export const PublicNavigate = ({
                 ]}
               >
                 <Input.Password
+                  name="password"
                   id="loginPassword"
                   prefix={<LockOutlined className="text-gray-400" />}
                   placeholder="Enter your password"
@@ -277,13 +332,22 @@ export const PublicNavigate = ({
                   bghover="hover:bg-main-2"
                   htmlType="submit"
                   loading={loading}
-                  // onClick={handleLogin}
+                  onClick={handleLogin}
                   size="large"
                   className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-blue-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-blue-700 hover:!to-blue-700 !text-white"
                 >
                   Sign in{" "}
                 </Button>
               </Form.Item>
+              <Divider style={{ borderColor: "#C1C1C1" }}>Sign in with</Divider>
+              <Button
+                icon={<FcGoogle size={20} />}
+                block
+                onClick={handleLoginGoogle}
+                className="w-full bg-gray-100 hover:bg-blue-300 flex items-center justify-center"
+              >
+                Google
+              </Button>
             </Form>
 
             <div className="mt-6 text-center">

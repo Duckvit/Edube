@@ -127,7 +127,7 @@ export const AdminHome = () => {
     labels: ["1 Star", "2 Stars", "3 Stars", "4 Stars", "5 Stars"],
     datasets: [
       {
-        label: "Number of Instructor",
+        label: "Number of Mentor",
         backgroundColor: "#4F46E5",
         borderColor: "#3730A3",
         borderWidth: 1,
@@ -156,7 +156,7 @@ export const AdminHome = () => {
       y: {
         title: {
           display: true,
-          text: "Number of Instructors",
+          text: "Number of Mentors",
           font: {
             size: 16,
             weight: "bold",
@@ -197,7 +197,7 @@ export const AdminHome = () => {
       render: (title, record) => (
         <div>
           <div className="font-medium">{title}</div>
-          <div className="text-sm text-gray-500">by {record.instructor}</div>
+          <div className="text-sm text-gray-500">by {record.mentor}</div>
         </div>
       ),
     },
@@ -240,7 +240,7 @@ export const AdminHome = () => {
     {
       key: "1",
       title: "Advanced React Development",
-      instructor: "Dr. Sarah Chen",
+      mentor: "Dr. Sarah Chen",
       students: 1247,
       revenue: 12470,
       rating: 4.9,
@@ -249,7 +249,7 @@ export const AdminHome = () => {
     {
       key: "2",
       title: "Python for Beginners",
-      instructor: "David Park",
+      mentor: "David Park",
       students: 2103,
       revenue: 12618,
       rating: 4.7,
@@ -258,7 +258,7 @@ export const AdminHome = () => {
     {
       key: "3",
       title: "Data Analysis with Excel",
-      instructor: "Maria Garcia",
+      mentor: "Maria Garcia",
       students: 1456,
       revenue: 10192,
       rating: 4.6,
@@ -267,7 +267,7 @@ export const AdminHome = () => {
     {
       key: "4",
       title: "Machine Learning Fundamentals",
-      instructor: "Prof. Michael Rodriguez",
+      mentor: "Prof. Michael Rodriguez",
       students: 856,
       revenue: 12840,
       rating: 4.8,
@@ -276,7 +276,7 @@ export const AdminHome = () => {
     {
       key: "5",
       title: "Digital Marketing Strategy",
-      instructor: "Lisa Thompson",
+      mentor: "Lisa Thompson",
       students: 743,
       revenue: 5944,
       rating: 4.5,
@@ -372,7 +372,7 @@ export const AdminHome = () => {
       <div className="flex gap-2 h-3/5 mt-3">
         <div className=" bg-white p-3 rounded-lg shadow-2xl col-span-2 w-7/12">
           <h2 className="text-2xl font-semibold mb-4 text-center text-gray-700">
-            Instructor Ratings
+            Mentor Ratings
           </h2>
           <div style={{ height: "300px" }}>
             <Bar data={barData} options={barOptions} />

@@ -55,3 +55,11 @@ export const changePassword = (data) =>
       reject(error);
     }
   });
+
+export const getProfile = async (username, token) => {
+  const res = await axiosConfig.get(`/api/profile`, {
+    params: { username },
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};

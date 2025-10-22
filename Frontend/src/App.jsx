@@ -8,7 +8,7 @@ import {
   HomePage,
   OTPInput,
   PublicAdmin,
-  PublicInstructor,
+  PublicMentor,
   PublicLayout,
   PublicLearner,
 } from "./pages";
@@ -19,22 +19,24 @@ import {
   Course,
   CourseManagement,
   Dashboard,
-  InstructorManagement,
+  MentorManagement,
   LearnerDashboard,
   LearnerManagement,
   Report,
   Learner,
-  UploadCourse,
   CourseDetail,
   UserProfile,
   CourseBuilder,
+  UploadLesson,
 } from "./components";
 import { useUserStore } from "./store/useUserStore";
 import { roleForComponent } from "./utils/constant";
+import { getProfile } from './apis/UserServices';
+import { parseJwt } from './utils/jwt'
 
 function App() {
   const [count, setCount] = useState(0);
-  const { token, role, resetUserStore } = useUserStore();
+  const { token, userData, setUserData, role, resetUserStore } = useUserStore();
   useEffect(() => {
     if (
       !localStorage?.getItem("token") ||
@@ -42,6 +44,17 @@ function App() {
     )
       resetUserStore();
   }, [useUserStore]);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (token && !userData) {
+        const decoded = parseJwt(token); // lấy username từ token nếu có
+        const profile = await getProfile(decoded.sub);
+        setUserData(profile.user);
+      }
+    };
+    fetchProfile();
+  }, [token]);
 
   return (
     <div>
@@ -66,24 +79,24 @@ function App() {
 
         <Route
           // Route cho trang insctructor
-          path={path.PUBLIC_INSTRUCTOR}
+          path={path.PUBLIC_MENTOR}
           element={
-            <PrivateRoute role={role}>
-              <PublicInstructor />
-            </PrivateRoute>
+            // <PrivateRoute role={role}>
+            <PublicMentor />
+            // </PrivateRoute>
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path={path.INSTRUCTOR_COURSE} element={<Course />} />
+          <Route path={path.MENTOR_COURSE} element={<Course />} />
           <Route
-            path={`${path.INSTRUCTOR_COURSE_BUILDER}/${path.INSTRUCTOR_UPLOAD_COURSE}`}
-            element={<UploadCourse />}
+            path={`${path.MENTOR_COURSE_BUILDER}/${path.MENTOR_UPLOAD_LESSON}`}
+            element={<UploadLesson />}
           />
           <Route
-            path={path.INSTRUCTOR_COURSE_BUILDER}
+            path={path.MENTOR_COURSE_BUILDER}
             element={<CourseBuilder />}
           />
-          <Route path={path.INSTRUCTOR_LEARNER} element={<Learner />} />
+          <Route path={path.MENTOR_LEARNER} element={<Learner />} />
           <Route path={path.USER_CHAT} element={<Chat />} />
           <Route path={path.USER_PROFILE} element={<UserProfile />} />
         </Route>
@@ -91,9 +104,9 @@ function App() {
           // Route cho trang admin
           path={path.PUBLIC_ADMIN}
           element={
-            <PrivateRoute role={role}>
-              <PublicAdmin />
-            </PrivateRoute>
+            // <PrivateRoute role={role}>
+            <PublicAdmin />
+            // </PrivateRoute>
           }
         >
           <Route index element={<AdminHome />} />
@@ -106,8 +119,8 @@ function App() {
             element={<LearnerManagement />}
           />
           <Route
-            path={path.ADMIN_INSTRUCTOR_MANAGEMENT}
-            element={<InstructorManagement />}
+            path={path.ADMIN_MENTOR_MANAGEMENT}
+            element={<MentorManagement />}
           />
           <Route path={path.REPORT} element={<Report />} />
         </Route>
@@ -115,9 +128,9 @@ function App() {
           // Route cho trang learner
           path={path.PUBLIC_LEARNER}
           element={
-            <PrivateRoute role={role}>
-              <PublicLearner />
-            </PrivateRoute>
+            // <PrivateRoute role={role}>
+            <PublicLearner />
+            // </PrivateRoute>
           }
         >
           <Route index element={<LearnerDashboard />} />

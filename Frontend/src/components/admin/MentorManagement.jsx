@@ -23,7 +23,7 @@ import {
   CloseCircleOutlined,
 } from "@ant-design/icons";
 
-export const InstructorManagement = () => {
+export const MentorManagement = () => {
   const { Search } = Input;
   const { Option } = Select;
   const [loading, setLoading] = useState(false);
@@ -49,7 +49,7 @@ export const InstructorManagement = () => {
       id: "USR002",
       name: "Dr. Sarah Chen",
       email: "sarah.chen@university.edu",
-      role: "instructor",
+      role: "mentor",
       status: "active",
       joinDate: "2023-11-20",
       lastLogin: "2024-01-19",
@@ -73,7 +73,7 @@ export const InstructorManagement = () => {
       id: "USR004",
       name: "Prof. Michael Rodriguez",
       email: "michael.rodriguez@college.edu",
-      role: "instructor",
+      role: "mentor",
       status: "active",
       joinDate: "2023-09-05",
       lastLogin: "2024-01-20",
@@ -85,7 +85,7 @@ export const InstructorManagement = () => {
       id: "USR005",
       name: "Lisa Thompson",
       email: "lisa.thompson@business.com",
-      role: "instructor",
+      role: "mentor",
       status: "pending",
       joinDate: "2024-01-18",
       lastLogin: "Never",
@@ -121,7 +121,7 @@ export const InstructorManagement = () => {
       id: "USR008",
       name: "David Park",
       email: "david.park@tech.com",
-      role: "instructor",
+      role: "mentor",
       status: "active",
       joinDate: "2023-08-20",
       lastLogin: "2024-01-20",
@@ -249,7 +249,7 @@ export const InstructorManagement = () => {
   return (
     <div className="w-full h-full bg-gray-100">
       <h1 className="text-2xl font-bold mb-3 text-gray-800">
-        Instructor Management
+        Mentor Management
       </h1>
 
       {/* Filters and Search */}
@@ -275,7 +275,7 @@ export const InstructorManagement = () => {
               >
                 <Option value="all">All Roles</Option>
                 <Option value="student">Students</Option>
-                <Option value="instructor">Instructors</Option>
+                <Option value="mentor">Mentors</Option>
               </Select> */}
               <Select
                 value={filterStatus}
@@ -318,4 +318,4 @@ export const InstructorManagement = () => {
   );
 };
 
-export default InstructorManagement;
+export default MentorManagement;

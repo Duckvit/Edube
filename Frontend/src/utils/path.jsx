@@ -11,18 +11,18 @@ export const path = {
   USER_PROFILE: "profile-user",
   USER_CHAT: "chat",
 
-  // INSTRUCTOR
-  PUBLIC_INSTRUCTOR: "instructor",
-  INSTRUCTOR_COURSE: "course",
-  INSTRUCTOR_COURSE_BUILDER: "course/:courseId/builder",
-  INSTRUCTOR_UPLOAD_COURSE: "upload-course",
-  INSTRUCTOR_LEARNER: "learner",
+  // MENTOR
+  PUBLIC_MENTOR: "mentor",
+  MENTOR_COURSE: "course",
+  MENTOR_COURSE_BUILDER: "course/:courseId/builder",
+  MENTOR_UPLOAD_LESSON: "upload-lesson",
+  MENTOR_LEARNER: "learner",
 
   // ADMIN
   PUBLIC_ADMIN: "admin",
   ADMIN_COURSE_MANAGEMENT: "course-management",
   ADMIN_LEARNER_MANAGEMENT: "learner-management",
-  ADMIN_INSTRUCTOR_MANAGEMENT: "instructor-management",
+  ADMIN_MENTOR_MANAGEMENT: "mentor-management",
   ADMIN_REPORT: "report",
 
   // LEARNER

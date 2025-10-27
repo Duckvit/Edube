@@ -25,6 +25,14 @@ export const getAllCourses = async (page = 0, size = 10, token) => {
   return res.data;
 };
 
+export const getCourseById = async (id, token) => {
+  // GET /api/courses/:id
+  const res = await axiosConfig.get(`/api/courses/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
 export const createCourse = async (token, data) => {
   const res = await axiosConfig.post(`/api/courses`, data, {
     headers: { Authorization: `Bearer ${token}` },

@@ -1,5 +1,8 @@
-import React, { useState } from "react";
-import { enrolledCourses, allCourses } from "../../utils/mockData";
+import React, { useState, useEffect } from "react";
+// previous static import (kept for reference):
+// import { enrolledCourses, allCourses } from "../../utils/mockData";
+import { useCourseStore } from "../../store/useCourseStore";
+import { getAllCourses } from "../../apis/CourseServices";
 import {
   Card,
   Tabs,
@@ -41,6 +44,47 @@ export const LearnerDashboard = () => {
   const [searchText, setSearchText] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
+
+  // Use reactive course store (replaces static mock imports)
+  const allCourses = useCourseStore((s) => s.allCourses);
+  const enrolledCourses = useCourseStore((s) => s.enrolledCourses);
+
+  // Fetch courses from API on mount and populate store
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const data = await getAllCourses(0, 100);
+        const payload = Array.isArray(data)
+          ? data
+          : data?.content || data?.data || [];
+
+        const mapped = payload.map((c, idx) => ({
+          key: c.key || String(idx + 1),
+          id: c.id || c.courseId || c._id || `API_${idx}`,
+          title: c.title || c.name || "Untitled Course",
+          instructor: c.instructor || c.author || "Unknown",
+          category: c.category || "General",
+          level: c.level || "All",
+          rating: c.rating || 5,
+          students: c.students || c.enrolledCount || 0,
+          price: c.price || c.fee || 0,
+          duration: c.duration || (c.hours ? `${c.hours} hours` : ""),
+          lessons: c.lessons || c.totalLessons || 0,
+          enrolled: !!c.enrolled || false,
+          thumbnail: c.thumbnail || c.image || null,
+        }));
+
+        if (mounted) useCourseStore.getState().setAllCourses(mapped);
+      } catch (err) {
+        console.error("getAllCourses failed", err);
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleContinueCourse = (courseId) => {
     navigate(`/learner/course-detail/${courseId}`);
@@ -282,7 +326,7 @@ export const LearnerDashboard = () => {
               className="h-full flex flex-col"
               cover={
                 <div className="h-40 bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center relative">
-                  <BookOutlined style={{ fontSize: 48, color: 'white' }} />
+                  <BookOutlined style={{ fontSize: 48, color: "white" }} />
                   {course.enrolled && (
                     <div className="absolute top-2 right-2">
                       <Tag color="green" icon={<CheckCircleOutlined />}>
@@ -292,36 +336,29 @@ export const LearnerDashboard = () => {
                   )}
                 </div>
               }
-              // actions={[
-              //   <Button
-              //     type={course.enrolled ? "default" : "primary"}
-              //     block
-              //     className={course.enrolled ? "" : "bg-blue-600"}
-              //     onClick={() => {
-              //       if (course.enrolled) {
-              //         navigate(`/learner/course-detail/${course.id}`);
-              //       } else {
-              //         navigate(`/learner/course-preview/${course.id}`);
-              //       }
-              //     }}
-              //   >
-              //     {course.enrolled
-              //       ? "Go to Course"
-              //       : `Enroll - $${course.price}`}
-              //   </Button>,
-              // ]}
             >
               <div className="flex flex-col h-full">
                 <div className="mb-2">
                   <Tag color="blue">{course.category}</Tag>
                   <Tag color="orange">{course.level}</Tag>
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{course.title}</h3>
-                <p className="text-sm text-gray-600 mb-2">by {course.instructor}</p>
+                <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
+                  {course.title}
+                </h3>
+                <p className="text-sm text-gray-600 mb-2">
+                  by {course.instructor}
+                </p>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center">
-                    <Rate disabled defaultValue={course.rating} allowHalf className="text-xs" />
-                    <span className="text-sm text-gray-600 ml-2">({course.rating})</span>
+                    <Rate
+                      disabled
+                      defaultValue={course.rating}
+                      allowHalf
+                      className="text-xs"
+                    />
+                    <span className="text-sm text-gray-600 ml-2">
+                      ({course.rating})
+                    </span>
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <UserOutlined className="mr-1" />
@@ -331,39 +368,33 @@ export const LearnerDashboard = () => {
                 <div className="text-sm text-gray-600 mb-3">
                   {course.lessons} lessons • {course.duration}
                 </div>
-                {/* <div className="mb-4" style={{ minHeight: '28px' }}>
+                <div className="mb-4" style={{ minHeight: "28px" }}>
                   {!course.enrolled && (
                     <div className="text-lg font-bold text-green-600">
                       ${course.price}
                     </div>
                   )}
-                </div> */}
+                </div>
                 <div className="mt-auto">
-                  {/* <Button
-                    type={course.enrolled ? 'default' : 'primary'}
+                  <Button
+                    type={course.enrolled ? "default" : "primary"}
                     block
                     size="large"
-                    className={course.enrolled ? 'font-medium' : 'bg-blue-600 font-medium'}
-                    onClick={() => course.enrolled && handleContinueCourse(course.id)}
-                  >
-                    {course.enrolled ? 'Go to Course' : `Enroll - $${course.price}`}
-                  </Button> */}
-                  <Button
-                  type={course.enrolled ? "default" : "primary"}
-                  block
-                  className={course.enrolled ? "" : "bg-blue-600"}
-                  onClick={() => {
-                    if (course.enrolled) {
-                      navigate(`/learner/course-detail/${course.id}`);
-                    } else {
-                      navigate(`/learner/course-preview/${course.id}`);
+                    className={
+                      course.enrolled
+                        ? "font-medium"
+                        : "bg-blue-600 font-medium"
                     }
-                  }}
-                >
-                  {course.enrolled
-                    ? "Go to Course"
-                    : `Enroll - $${course.price}`}
-                </Button>
+                    onClick={() =>
+                      course.enrolled
+                        ? handleContinueCourse(course.id)
+                        : navigate(`/learner/course-preview/${course.id}`)
+                    }
+                  >
+                    {course.enrolled
+                      ? "Go to Course"
+                      : `Enroll - $${course.price}`}
+                  </Button>
                 </div>
               </div>
             </Card>

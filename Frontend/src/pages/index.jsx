@@ -6,6 +6,8 @@ export { default as HomePage } from './public/HomePage';
 export { default as ForgotPass } from './public/ForgotPass';
 export { default as OTPInput } from './public/OTPInput';
 export { default as ChangePass } from './public/ChangePass';
+export { default as RoleSelectionPage } from './public/RoleSelectionPage';
+export { default as OAuthCallback } from './public/OAuthCallback';
 
 // users
 export { default as PublicMentor } from './users/PublicMentor';

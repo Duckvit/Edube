@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 // previous static import (kept for reference):
 // import { enrolledCourses, allCourses } from "../../utils/mockData";
-import { useCourseStore } from "../../store/useCourseStore";
 import { getAllCourses } from "../../apis/CourseServices";
+import { getEnrollmentByLearnerId } from "../../apis/EnrollmentServices";
+import { createPayment } from "../../apis/PaymentServices";
+import { toast } from "react-toastify";
 import {
   Card,
   Tabs,
@@ -14,22 +16,15 @@ import {
   Progress,
   Rate,
   Tag,
-  Avatar,
-  Dropdown,
 } from "antd";
 import {
   SearchOutlined,
   FilterOutlined,
   BookOutlined,
   PlayCircleOutlined,
-  ClockCircleOutlined,
   CheckCircleOutlined,
   HeartOutlined,
-  StarOutlined,
   UserOutlined,
-  CaretDownOutlined,
-  LogoutOutlined,
-  SettingOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useUserStore } from "../../store/useUserStore";
@@ -46,72 +41,69 @@ export const LearnerDashboard = () => {
   const [searchText, setSearchText] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(null);
+  const [courses, setCourses] = useState(null);
+  const [allCourses, setAllCourses] = useState([]);
+  const [enrolledCourses, setEnrolledCourses] = useState([]);
 
-  // Use reactive course store (replaces static mock imports)
-  const allCourses = useCourseStore((s) => s.allCourses);
-  const enrolledCourses = useCourseStore((s) => s.enrolledCourses);
-  const userData = useUserStore((s) => s.userData);
+    const userData = useUserStore((s) => s.userData);
 
-  // Fetch courses from API on mount and populate store
+
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
+    const fetchAllCourses = async () => {
       try {
-        const data = await getAllCourses(0, 100);
-        const payload = Array.isArray(data)
-          ? data
-          : data?.content || data?.data || [];
-
-        const mapped = payload.map((c, idx) => ({
-          key: c.key || String(idx + 1),
-          id: c.id || c.courseId || c._id || `API_${idx}`,
-          title: c.title || c.name || "Untitled Course",
-          instructor: c.mentor.user.fullName || "Unknown",
-          category: c.category || "General",
-          level: c.level || "All",
-          rating: c.rating || 5,
-          // prefer API fields: totalStudents and durationHours
-          students: c.totalStudents ?? c.students ?? c.enrolledCount ?? 0,
-          price: c.price || c.fee || 0,
-          duration:
-            c.duration ||
-            (c.durationHours
-              ? `${c.durationHours}h`
-              : c.hours
-              ? `${c.hours}h`
-              : ""),
-          lessons: c.lessons || c.totalLessons || 0,
-          enrolled: !!c.enrolled || false,
-          thumbnail: c.thumbnail || c.image || null,
-        }));
-
-        if (mounted) {
-          useCourseStore.getState().setAllCourses(mapped);
-
-          // load enrollments for current learner and populate enrolled list
-          try {
-            const learnerId =
-              userData?.id || useUserStore.getState().userData?.id || 1;
-            const enrollments = await getEnrollmentsByLearner(learnerId);
-            // enrollments may be array or wrapped in data
-            const enrollPayload = Array.isArray(enrollments)
-              ? enrollments
-              : enrollments?.data || enrollments?.content || [];
-            useCourseStore.getState().setEnrolledFromApi(enrollPayload);
-          } catch (e) {
-            // ignore enrollment errors for now
-            console.error("Failed to load enrollments", e);
-          }
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setError("Token không tồn tại");
+          return;
         }
+
+        setLoading(true);
+        const data = await getAllCourses(0, 10, token);
+        console.log("📘 API response:", data);
+
+        // ✅ Lưu danh sách khóa học đúng cách
+        const coursesData = data?.content || [];
+        console.log("📘 Courses data:", coursesData);
+        console.log("📘 First course:", coursesData[0]);
+        setCourses(coursesData);
+        setAllCourses(coursesData);
       } catch (err) {
-        console.error("getAllCourses failed", err);
+        console.error("Lỗi khi gọi API:", err);
+        setError(err.message || "Đã xảy ra lỗi");
+      } finally {
+        setLoading(false);
       }
     };
-    load();
-    return () => {
-      mounted = false;
-    };
+
+    fetchAllCourses();
   }, []);
+
+  const handleEnroll = async (courseId) => {
+    try {
+      const token = localStorage.getItem("token");
+      console.log(token);
+
+      if (!token) {
+        toast.error("Please log in before enrolling");
+        return;
+      }
+
+      const payload = { courseId };
+      const res = await createPayment(payload, token);
+
+      if (res?.checkoutUrl) {
+        toast.success("Redirecting to payment...");
+        window.location.href = res.checkoutUrl;
+      } else {
+        toast.error("Failed to create payment link");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error creating payment link");
+    }
+  };
 
   const handleContinueCourse = (courseId) => {
     navigate(`/learner/course-detail/${courseId}`);
@@ -155,13 +147,16 @@ export const LearnerDashboard = () => {
   const filteredAllCourses = allCourses.filter((course) => {
     const matchesSearch =
       course.title.toLowerCase().includes(searchText.toLowerCase()) ||
-      course.instructor.toLowerCase().includes(searchText.toLowerCase());
+      (course.mentor?.user?.username || "").toLowerCase().includes(searchText.toLowerCase());
     const matchesCategory =
       categoryFilter === "all" || course.category === categoryFilter;
     const matchesLevel = levelFilter === "all" || course.level === levelFilter;
 
     return matchesSearch && matchesCategory && matchesLevel;
   });
+
+  console.log("📘 All courses:", allCourses);
+  console.log("📘 Filtered courses:", filteredAllCourses);
 
   const categories = [...new Set(allCourses.map((course) => course.category))];
   const levels = [...new Set(allCourses.map((course) => course.level))];
@@ -219,6 +214,14 @@ export const LearnerDashboard = () => {
                   <BookOutlined style={{ fontSize: 48, color: "white" }} />
                 </div>
               }
+              styles={{
+                body: {
+                  padding: "16px",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                },
+              }}
             >
               <div className="flex flex-col h-full">
                 <div className="mb-2">
@@ -232,10 +235,8 @@ export const LearnerDashboard = () => {
                 <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
                   {course.title}
                 </h3>
-                <p className="text-sm text-gray-600 mb-2">
-                  by {course.instructor}
-                </p>
-                <div className="flex items-center mb-2">
+                <p className="text-sm text-gray-600 mb-2">by {course.mentor}</p>
+                {/* <div className="flex items-center mb-2">
                   <Rate
                     disabled
                     defaultValue={course.rating}
@@ -245,7 +246,7 @@ export const LearnerDashboard = () => {
                   <span className="text-sm text-gray-600 ml-2">
                     ({course.rating})
                   </span>
-                </div>
+                </div> */}
                 <div className="text-sm text-gray-600 mb-3">
                   {course.completedLessons}/{course.totalLessons} lessons •{" "}
                   {course.duration}
@@ -363,6 +364,14 @@ export const LearnerDashboard = () => {
                   )}
                 </div>
               }
+              styles={{
+                body: {
+                  padding: "16px",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                },
+              }}
             >
               <div className="flex flex-col h-full">
                 <div className="mb-2">
@@ -373,32 +382,39 @@ export const LearnerDashboard = () => {
                   {course.title}
                 </h3>
                 <p className="text-sm text-gray-600 mb-2">
-                  by {course.instructor}
+                  by {course?.mentor?.user?.username}
                 </p>
                 <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <Rate
-                      disabled
-                      defaultValue={course.rating}
-                      allowHalf
-                      className="text-xs"
-                    />
-                    <span className="text-sm text-gray-600 ml-2">
-                      ({course.rating})
-                    </span>
+                  <div className="text-sm text-gray-600 mb-1">
+                    {course?.sections?.length || 0} sections •{/* {course.duration} */}
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <UserOutlined className="mr-1" />
-                    {course.students.toLocaleString()}
+                    {course?.totalStudents || 0}
                   </div>
                 </div>
-                <div className="text-sm text-gray-600 mb-3">
-                  {course.lessons} lessons • {course.duration}
+
+                {course.description && (
+                  <div className="text-sm text-gray-700 mb-2 line-clamp-2">
+                    {course.description}
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                  {course.status && (
+                    <Tag color="geekblue">
+                      {String(course.status).toUpperCase()}
+                    </Tag>
+                  )}
+                  {course.createdAt && (
+                    <span>
+                      Created {new Date(course.createdAt).toLocaleDateString()}
+                    </span>
+                  )}
                 </div>
                 <div className="mb-4" style={{ minHeight: "28px" }}>
                   {/* {!course.enrolled && (
                     <div className="text-lg font-bold text-green-600">
-                      ${course.price}
+                      {course.price}
                     </div>
                   )} */}
                 </div>
@@ -415,12 +431,10 @@ export const LearnerDashboard = () => {
                     onClick={() =>
                       course.enrolled
                         ? handleContinueCourse(course.id)
-                        : navigate(`/learner/course-preview/${course.id}`)
+                        : handleEnroll(course.id)
                     }
                   >
-                    {course.enrolled
-                      ? "Go to Course"
-                      : `Enroll - $${course.price}`}
+                    {course.enrolled ? "Go to Course" : `Enroll `}
                   </Button>
                 </div>
               </div>

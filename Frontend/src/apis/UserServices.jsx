@@ -57,9 +57,14 @@ export const changePassword = (data) =>
   });
 
 export const getProfile = async (username, token) => {
-  const res = await axiosConfig.get(`/api/profile`, {
-    params: { username },
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return res.data;
+  try {
+    const res = await axiosConfig.get(`/api/profile`, {
+      params: { username },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.data;
+  } catch (error) {
+    console.error("Error getting profile:", error);
+    throw error;
+  }
 };

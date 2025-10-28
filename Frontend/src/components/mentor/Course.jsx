@@ -55,7 +55,7 @@ export const Course = () => {
 };
 
 useEffect(() => {
-  fetchCourses(); // 🔁 gọi khi trang load hoặc đổi page/size
+  fetchCourses(); // gọi khi trang load hoặc đổi page/size
 }, [page, size]);
 
   const handleChange = (e) =>

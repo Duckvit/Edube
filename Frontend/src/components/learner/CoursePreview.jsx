@@ -1,50 +1,41 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card, Button, Rate, Collapse, List, Avatar } from "antd";
+import { Card, Button, Rate, Collapse, List } from "antd";
 import {
   PlayCircleOutlined,
   LockOutlined,
-  UserOutlined,
   ArrowLeftOutlined,
 } from "@ant-design/icons";
-import { courseData } from "../../utils/mockData";
-import { useCourseStore } from "../../store/useCourseStore";
 import useAiStore from "../../store/useAiStore";
 import { getCourseById as fetchCourseById } from "../../apis/CourseServices";
-import { useState, useEffect } from "react";
 
 const { Panel } = Collapse;
 
 const CoursePreview = () => {
   const { id } = useParams();
-  console.log(id);
   const navigate = useNavigate();
-  const storeCourse = useCourseStore((s) => s.getCourseById(id));
-  const [remoteCourse, setRemoteCourse] = useState(null);
 
-  // If the course isn't present in the store (for example user navigated directly), fetch it from API
+  // ✅ State cục bộ thay cho Zustand
+  const [course, setCourse] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // ✅ Fetch dữ liệu thật từ API
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      if (storeCourse) return;
+    const loadCourse = async () => {
       try {
-        const res = await fetchCourseById(id);
-        // API shape may vary; map defensively to our UI shape
-        // const c = res?.data || res || {};
-        // const mapped = {
-        //   id: c.id || c.courseId || c._id || id,
-        //   title: c.title || c.name || "Untitled Course",
-        //   instructor: c.instructor || c.author || "Unknown",
-        //   category: c.category || "General",
-        //   level: c.level || "All",
-        //   rating: c.rating || 5,
-        //   students: c.totalStudents ?? c.students ?? c.enrolledCount ?? 0,
-        //   price: c.price || c.fee || 0,
-        //   duration: c.duration || (c.durationHours ? `${c.durationHours}h` : c.hours ? `${c.hours}h` : ""),
-        //   lessons: c.lessons || c.totalLessons || 0,
-        //   enrolled: !!c.enrolled || false,
-        //   thumbnail: c.thumbnail || c.image || null,
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setError("Token không tồn tại");
+          setLoading(false);
+          return;
+        }
+
+        const res = await fetchCourseById(id, token);
         const c = res?.data || res || {};
+
+        // 🔁 Chuẩn hóa dữ liệu về format UI
         const mapped = {
           id: c.id || c.courseId || c._id || id,
           title: c.title || c.name || "Untitled Course",
@@ -70,32 +61,42 @@ const CoursePreview = () => {
           instructor: c.mentor.user.fullName || "Unknown",
         };
 
-        if (mounted) {
-          setRemoteCourse(mapped);
-          // add to store if not already present
-          const existing = useCourseStore.getState().allCourses || [];
-          const exists = existing.find((x) => x.id === mapped.id);
-          if (!exists) {
-            useCourseStore.getState().setAllCourses([...existing, mapped]);
-          }
-        }
+        setCourse(mapped);
       } catch (err) {
-        console.error("Failed to fetch course by id", err);
+        console.error("Lỗi khi gọi API:", err);
+        setError(err.message || "Không thể tải dữ liệu khóa học");
+      } finally {
+        setLoading(false);
       }
     };
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [id, storeCourse]);
 
-  const course =
-    storeCourse || remoteCourse || courseData[id] || courseData.CRS001;
-  console.log(course);
-  // course.description = course.description.toUpperCase()
+    loadCourse();
+  }, [id]);
+
+  if (loading)
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p>Loading course...</p>
+      </div>
+    );
+
+  if (error)
+    return (
+      <div className="flex justify-center items-center h-screen text-red-500">
+        {error}
+      </div>
+    );
+
+  if (!course)
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p>No course found.</p>
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -109,7 +110,7 @@ const CoursePreview = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {course.title}
               </h1>
-              <p className="text-gray-600 mb-4">by {course.instructor}</p>
+              <p className="text-gray-600 mb-4">by {course.mentor}</p>
               <div className="flex items-center space-x-6 text-sm text-gray-600">
                 <div className="flex items-center">
                   <Rate
@@ -120,7 +121,7 @@ const CoursePreview = () => {
                   />
                   <span>{course.rating}</span>
                 </div>
-                <span>{course.students.toLocaleString()} students</span>
+                <span>{course.students} students</span>
                 <span>{course.duration}</span>
               </div>
             </div>
@@ -128,8 +129,10 @@ const CoursePreview = () => {
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left: Course Info */}
           <div className="lg:col-span-2">
             <Card className="mb-6">
               <div className="aspect-video rounded-lg flex items-center justify-center bg-black text-white">
@@ -160,8 +163,8 @@ const CoursePreview = () => {
                   <div className="text-sm text-gray-600">Duration</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold te xt-purple-600">
-                    {course.students.toLocaleString()}
+                  <div className="text-2xl font-bold text-purple-600">
+                    {course.students}
                   </div>
                   <div className="text-sm text-gray-600">Students</div>
                 </div>
@@ -175,6 +178,7 @@ const CoursePreview = () => {
             </Card>
           </div>
 
+          {/* Right: Curriculum + Action */}
           <div className="lg:col-span-1">
             <Card title="Course Curriculum" className="sticky top-4">
               <Collapse accordion>
@@ -244,12 +248,11 @@ const CoursePreview = () => {
                 ))}
               </Collapse>
 
-              <div className="mt-6">
-                <div className="mb-4 text-center">
-                  <div className="text-2xl font-bold text-gray-900">
-                    {course.price ? `${course.price} USD` : "Free"}
-                  </div>
+              <div className="mt-6 text-center">
+                <div className="mb-4 text-2xl font-bold text-gray-900">
+                  {course.price ? `${course.price} USD` : "Free"}
                 </div>
+
                 {course.enrolled ? (
                   <Button
                     size="large"

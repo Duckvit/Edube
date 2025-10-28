@@ -113,6 +113,29 @@ export const menuNavbarItemsAdmin = [
   // },
 ];
 
+export const menuNavbarItemsLearner = [
+  {
+    key: "dashboard",
+    icon: <HomeOutlined />,
+    label: (
+      <NavLink to={"/learner"} className="text-white">
+        Dashboard
+      </NavLink>
+    ),
+    className: "text-white text-lg",
+  },
+  {
+    key: "chat",
+    icon: <MessageOutlined />,
+    label: (
+      <NavLink to={path.USER_CHAT} className="text-white">
+        Chat
+      </NavLink>
+    ),
+    className: "text-white text-lg",
+  },
+];
+
 export const roleForComponent = {
   ADMIN: path.PUBLIC_ADMIN,
   LEARNER: path.PUBLIC_LEARNER,

@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useUserStore } from "../../store/useUserStore";
+import { getProfile } from "../../apis/UserServices";
 import {
   Card,
   Avatar,
@@ -20,10 +23,7 @@ import {
   StarOutlined,
   BookOutlined,
   TrophyOutlined,
-  ArrowLeftOutlined
 } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
-import { useUserStore } from "../../store/useUserStore";
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -33,29 +33,36 @@ export const UserProfile = () => {
   const navigate = useNavigate();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [form] = Form.useForm();
+  const { name, id } = useParams();
 
-  const [profileData, setProfileData] = useState({
-    learner: {
-      username: "learner_user",
-      fullName: "John Doe",
-      email: "learner@example.com",
-      phone: "+1234567890",
-      educationLevel: "Bachelor's Degree",
-      avatarUrl: null,
-    },
-    instructor: {
-      username: "instructor_user",
-      fullName: "Dr. Sarah Chen",
-      email: "instructor@example.com",
-      phone: "+1987654321",
-      rating: 4.9,
-      expertiseArea: "Web Development, React, JavaScript",
-      bio: "Experienced software engineer with 10+ years in web development. Passionate about teaching and helping students master modern web technologies.",
-      avatarUrl: null,
-    },
-  });
+  const [profile, setProfile] = useState(null);
 
-  const currentProfile = profileData[role];
+  const currentProfile = profile ? profile[role] : null;
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const roleProfile = name ? name.toUpperCase() : role;
+      const username = localStorage.getItem("username");
+      const token = localStorage.getItem("token");
+
+      if (!username || !token) return;
+
+      try {
+        const response = await getProfile(username, token); 
+        const user = response?.user;
+
+        const data = roleProfile === "MENTOR" ? user?.mentor : user?.learner;
+
+        setProfile({ ...user, ...data }); // ✅ Gộp profile chung
+      } catch (err) {
+        console.error("Error fetching profile:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
 
   const showEditModal = () => {
     if (role === "learner") {
@@ -83,8 +90,8 @@ export const UserProfile = () => {
 
   const handleEditSubmit = async (values) => {
     try {
-      setProfileData({
-        ...profileData,
+      setProfile({
+        ...profile,
         [role]: {
           ...currentProfile,
           ...values,
@@ -98,7 +105,7 @@ export const UserProfile = () => {
   };
 
   const expertiseAreas =
-    role === "instructor"
+    role === "mentor"
       ? currentProfile.expertiseArea.split(",").map((area) => area.trim())
       : [];
 
@@ -113,13 +120,12 @@ export const UserProfile = () => {
             Back to Dashboard
           </button> */}
         <div className="mb-6 flex items-center justify-between">
-          
           <div>
             <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
             <p className="text-gray-600 mt-1">
               {role === "learner"
                 ? "Manage your personal information"
-                : "Manage your instructor information"}
+                : "Manage your mentor information"}
             </p>
           </div>
           <Button
@@ -161,10 +167,10 @@ export const UserProfile = () => {
                   ) : (
                     <TrophyOutlined className="mr-1" />
                   )}
-                  {role === "learner" ? "Learner" : "Instructor"}
+                  {role === "learner" ? "Learner" : "Mentor"}
                 </div>
 
-                {role === "instructor" && (
+                {role === "mentor" && (
                   <div className="flex items-center justify-center bg-amber-50 px-4 py-2 rounded-lg">
                     <StarOutlined className="text-amber-500 text-lg mr-2" />
                     <span className="text-2xl font-bold text-gray-900">
@@ -234,7 +240,7 @@ export const UserProfile = () => {
                   </Descriptions.Item>
                 )}
 
-                {role === "instructor" && (
+                {role === "mentor" && (
                   <>
                     <Descriptions.Item label="Rating">
                       <div className="flex items-center">
@@ -395,7 +401,7 @@ export const UserProfile = () => {
             </Form.Item>
           )}
 
-          {role === "instructor" && (
+          {role === "mentor" && (
             <>
               <Form.Item
                 label="Expertise Area"

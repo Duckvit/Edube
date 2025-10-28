@@ -26,7 +26,6 @@ export const getAllCourses = async (page = 0, size = 10, token) => {
 };
 
 export const getCourseById = async (id, token) => {
-  // GET /api/courses/:id
   const res = await axiosConfig.get(`/api/courses/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -35,6 +34,20 @@ export const getCourseById = async (id, token) => {
 
 export const createCourse = async (token, data) => {
   const res = await axiosConfig.post(`/api/courses`, data, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res;
+};
+
+export const updateCourse = async (token, data) => {
+  const res = await axiosConfig.put(`/api/courses/${id}`, data, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res;
+};
+
+export const deleteCourse = async (token) => {
+  const res = await axiosConfig.delete(`/api/courses/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return res;

@@ -11,6 +11,8 @@ import {
   PublicMentor,
   PublicLayout,
   PublicLearner,
+  RoleSelectionPage,
+  OAuthCallback,
 } from "./pages";
 import PrivateRoute from "./middlewares/PrivateRoute";
 import {
@@ -26,15 +28,16 @@ import {
   Learner,
   CourseDetail,
   CoursePreview,
-  PaymentPage,
   UserProfile,
   CourseBuilder,
   UploadLesson,
+  PaymentSuccess,
+  PaymentFail,
 } from "./components";
 import { useUserStore } from "./store/useUserStore";
 import { roleForComponent } from "./utils/constant";
-import { getProfile } from './apis/UserServices';
-import { parseJwt } from './utils/jwt'
+import { getProfile } from "./apis/UserServices";
+import { parseJwt } from "./utils/jwt";
 
 function App() {
   const [count, setCount] = useState(0);
@@ -51,12 +54,22 @@ function App() {
     const fetchProfile = async () => {
       if (token && !userData) {
         const decoded = parseJwt(token); // lấy username từ token nếu có
-        const profile = await getProfile(decoded.sub);
-        setUserData(profile.user);
+        if (decoded && decoded.sub) {
+          try {
+            const profile = await getProfile(decoded.sub, token);
+            if (profile && profile.user) {
+              setUserData(profile.user);
+            }
+          } catch (error) {
+            console.error("Error fetching profile:", error);
+            // Don't show error toast here as it might be a temporary issue
+          }
+        }
       }
     };
     fetchProfile();
-  }, [token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, userData]);
 
   return (
     <div>
@@ -77,6 +90,8 @@ function App() {
           <Route path={path.FORGOT_PASS} element={<ForgotPass />} />
           <Route path={path.OTP_INPUT} element={<OTPInput />} />
           <Route path={path.CHANGE_PASS} element={<ChangePass />} />
+          <Route path={path.ROLE_SELECTION} element={<RoleSelectionPage />} />
+          <Route path={path.OAuthCallback} element={<OAuthCallback />} />
         </Route>
 
         <Route
@@ -136,12 +151,15 @@ function App() {
           }
         >
           <Route index element={<LearnerDashboard />} />
+          <Route path={path.USER_PROFILE} element={<UserProfile />} />
           <Route path={path.LEARNER_COURSE_DETAIL} element={<CourseDetail />} />
+          <Route path={path.USER_CHAT} element={<Chat />} />
           <Route
             path={path.LEARNER_COURSE_PREVIEW}
             element={<CoursePreview />}
           />
-          <Route path={path.LEARNER_PAYMENT} element={<PaymentPage />} />
+          <Route path={path.LEARNER_PAYMENT_SUCCESS} element={<PaymentSuccess />} />
+          <Route path={path.LEARNER_PAYMENT_FAIL} element={<PaymentFail />} />
         </Route>
       </Routes>
     </div>

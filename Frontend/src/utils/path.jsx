@@ -6,6 +6,8 @@ export const path = {
   FORGOT_PASS: "forgot-password",
   CHANGE_PASS: "change-password",
   OTP_INPUT: "send-recovery-otp",
+  ROLE_SELECTION: "choose-role",
+  OAuthCallback: "login",
 
   // COMMON USER
   USER_PROFILE: "profile-user",
@@ -30,6 +32,8 @@ export const path = {
   LEARNER_COURSE_DETAIL: "course-detail/:id",
   LEARNER_COURSE_PREVIEW: "course-preview/:id",
   LEARNER_PAYMENT: "payment/:id",
+  LEARNER_PAYMENT_SUCCESS: "payment-success",
+  LEARNER_PAYMENT_FAIL: "payment-failed",
 };
 
 export default path;

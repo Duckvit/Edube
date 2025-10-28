@@ -79,12 +79,31 @@ export const PublicNavigate = ({
     const token = queryParams.get("token");
     const role = queryParams.get("role");
 
-    // Kiểm tra nếu token không phải là null và hợp lệ
-    if (token && token !== "null" && role) {
-      setModal(token, role, true);
-      navigate(roleForComponent[role]);
-      toast.success("Login Successful");
+    if (token && token !== "null") {
+      // Save token first - use "USER" as default if role is empty
+      const defaultRole = role || "USER";
+      setModal(token, defaultRole, true);
+      
+      // Normalize role to uppercase for comparison
+      const normalizedRole = defaultRole?.toUpperCase();
+      
+      // Small delay to ensure token is saved to localStorage
+      setTimeout(() => {
+        if (normalizedRole === "USER" || !normalizedRole || normalizedRole === "") {
+          // 🧩 Nếu là user mặc định → bắt qua trang chọn role
+          toast.info("Please select your role to continue");
+          navigate("/choose-role");
+        } else if (normalizedRole && roleForComponent[normalizedRole]) {
+          // ✅ Nếu có role hợp lệ → điều hướng như bình thường
+          toast.success("Login Successful");
+          navigate("/" + roleForComponent[normalizedRole]);
+        } else {
+          console.log("Invalid role detected:", role, "Normalized:", normalizedRole);
+          toast.error("Invalid role detected");
+        }
+      }, 100);
     } else if (token === "null") {
+      // ❌ Login thất bại
       resetUserStore();
       toast.error("Login Failed: Your email was not found");
       window.history.replaceState({}, document.title, location.pathname);
@@ -118,10 +137,10 @@ export const PublicNavigate = ({
         }
 
         // ✅ Điều hướng theo role
-        const path = roleForComponent[userRole];
-        if (userRole && path) {
+        const dashboardPath = roleForComponent[userRole];
+        if (userRole && dashboardPath) {
           toast.success("Login successful!");
-          navigate(path);
+          navigate("/" + dashboardPath);
         } else {
           toast.error("Invalid role.");
         }
@@ -438,16 +457,16 @@ export const PublicNavigate = ({
                   />
                 </Form.Item>
 
-                {/* <Form.Item
+                <Form.Item
                   label="Role"
                   name="role"
                   rules={[{ required: true }]}
                 >
                   <Radio.Group className="w-full flex justify-between">
-                    <Radio value="student">Student</Radio>
-                    <Radio value="instructor">Instructor</Radio>
+                    <Radio value="learner">Learner</Radio>
+                    <Radio value="mentor">Mentor</Radio>
                   </Radio.Group>
-                </Form.Item> */}
+                </Form.Item>
 
                 <Form.Item
                   label="Password"

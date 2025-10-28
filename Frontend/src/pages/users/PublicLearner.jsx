@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { Navigation } from "../../components";
-import { menuNavbarItemsMentor } from "../../utils/constant";
+import { menuNavbarItemsLearner } from "../../utils/constant";
 import PublicFooter from "../public/PublicFooter";
 import { Outlet } from "react-router-dom";
 import AiChat from "../../components/common/AiChat";
@@ -8,7 +8,7 @@ import AiChat from "../../components/common/AiChat";
 export const PublicLearner = () => {
   return (
     <div className="min-h-screen w-full flex-wrap flex justify-end">
-      <Navigation menuNavbar={menuNavbarItemsMentor} showSidebar={false}>
+      <Navigation menuNavbar={menuNavbarItemsLearner} showSidebar={true}>
         <Outlet />
         <AiChat />
         {/* <PublicFooter /> */}

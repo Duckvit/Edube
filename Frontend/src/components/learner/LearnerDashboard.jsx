@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 // previous static import (kept for reference):
 // import { enrolledCourses, allCourses } from "../../utils/mockData";
 import { getAllCourses } from "../../apis/CourseServices";
-import { getEnrollmentByLearnerId } from "../../apis/EnrollmentServices";
 import { createPayment } from "../../apis/PaymentServices";
 import { toast } from "react-toastify";
 import {
@@ -47,8 +46,7 @@ export const LearnerDashboard = () => {
   const [allCourses, setAllCourses] = useState([]);
   const [enrolledCourses, setEnrolledCourses] = useState([]);
 
-    const userData = useUserStore((s) => s.userData);
-
+  const userData = useUserStore((s) => s.userData);
 
   useEffect(() => {
     const fetchAllCourses = async () => {
@@ -147,7 +145,9 @@ export const LearnerDashboard = () => {
   const filteredAllCourses = allCourses.filter((course) => {
     const matchesSearch =
       course.title.toLowerCase().includes(searchText.toLowerCase()) ||
-      (course.mentor?.user?.username || "").toLowerCase().includes(searchText.toLowerCase());
+      (course.mentor?.user?.username || "")
+        .toLowerCase()
+        .includes(searchText.toLowerCase());
     const matchesCategory =
       categoryFilter === "all" || course.category === categoryFilter;
     const matchesLevel = levelFilter === "all" || course.level === levelFilter;
@@ -263,7 +263,10 @@ export const LearnerDashboard = () => {
                   )}
                 </div>
                 <div className="text-xs text-gray-500 mb-4">
-                  Last accessed: {course.lastAccessed ? course.lastAccessed.slice(0, 10) : "N/A"}
+                  Last accessed:{" "}
+                  {course.lastAccessed
+                    ? course.lastAccessed.slice(0, 10)
+                    : "N/A"}
                 </div>
                 <div className="mt-auto">
                   <Button
@@ -386,7 +389,8 @@ export const LearnerDashboard = () => {
                 </p>
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-sm text-gray-600 mb-1">
-                    {course?.sections?.length || 0} sections •{/* {course.duration} */}
+                    {course?.sections?.length || 0} sections •
+                    {/* {course.duration} */}
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <UserOutlined className="mr-1" />
@@ -411,13 +415,18 @@ export const LearnerDashboard = () => {
                     </span>
                   )}
                 </div>
-                <div className="mb-4" style={{ minHeight: "28px" }}>
-                  {/* {!course.enrolled && (
+                <div
+                  className="mb-4 flex justify-center items-center"
+                  style={{ minHeight: "28px" }}
+                >
+                  {!course.enrolled && (
                     <div className="text-lg font-bold text-green-600">
-                      {course.price}
+                      {new Intl.NumberFormat("vi-VN").format(course.price || 0)}{" "}
+                      VNĐ
                     </div>
-                  )} */}
+                  )}
                 </div>
+
                 <div className="mt-auto">
                   <Button
                     type={course.enrolled ? "default" : "primary"}

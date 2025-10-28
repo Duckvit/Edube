@@ -8,4 +8,3 @@ export const getEnrollmentsByLearner = async (learnerId, token) => {
   return res.data;
 };
 
-export default { getEnrollmentsByLearner };

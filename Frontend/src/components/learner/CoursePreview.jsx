@@ -30,23 +30,44 @@ const CoursePreview = () => {
       try {
         const res = await fetchCourseById(id);
         // API shape may vary; map defensively to our UI shape
+        // const c = res?.data || res || {};
+        // const mapped = {
+        //   id: c.id || c.courseId || c._id || id,
+        //   title: c.title || c.name || "Untitled Course",
+        //   instructor: c.instructor || c.author || "Unknown",
+        //   category: c.category || "General",
+        //   level: c.level || "All",
+        //   rating: c.rating || 5,
+        //   students: c.totalStudents ?? c.students ?? c.enrolledCount ?? 0,
+        //   price: c.price || c.fee || 0,
+        //   duration: c.duration || (c.durationHours ? `${c.durationHours}h` : c.hours ? `${c.hours}h` : ""),
+        //   lessons: c.lessons || c.totalLessons || 0,
+        //   enrolled: !!c.enrolled || false,
+        //   thumbnail: c.thumbnail || c.image || null,
         const c = res?.data || res || {};
         const mapped = {
           id: c.id || c.courseId || c._id || id,
           title: c.title || c.name || "Untitled Course",
-          instructor: c.instructor || c.author || "Unknown",
+          //instructor: c.instructor || c.author || "Unknown",
           category: c.category || "General",
           level: c.level || "All",
           rating: c.rating || 5,
-          students: c.students || c.enrolledCount || 0,
+          students: c.totalStudents ?? c.students ?? c.enrolledCount ?? 0,
           price: c.price || c.fee || 0,
-          duration: c.duration || (c.hours ? `${c.hours} hours` : ""),
+          duration:
+            c.duration ||
+            (c.durationHours
+              ? `${c.durationHours}h`
+              : c.hours
+              ? `${c.hours}h`
+              : ""),
           lessons: c.lessons || c.totalLessons || 0,
           enrolled: !!c.enrolled || false,
           thumbnail: c.thumbnail || c.image || null,
           description: c.description || c.summary || c.overview || "",
           totalLessons: c.totalLessons || c.lessons || 0,
           curriculum: c.curriculum || c.sections || [],
+          instructor: c.mentor.user.fullName || "Unknown",
         };
 
         if (mounted) {
@@ -71,6 +92,7 @@ const CoursePreview = () => {
   const course =
     storeCourse || remoteCourse || courseData[id] || courseData.CRS001;
   console.log(course);
+  // course.description = course.description.toUpperCase()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -138,7 +160,7 @@ const CoursePreview = () => {
                   <div className="text-sm text-gray-600">Duration</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">
+                  <div className="text-2xl font-bold te xt-purple-600">
                     {course.students.toLocaleString()}
                   </div>
                   <div className="text-sm text-gray-600">Students</div>
@@ -156,33 +178,67 @@ const CoursePreview = () => {
           <div className="lg:col-span-1">
             <Card title="Course Curriculum" className="sticky top-4">
               <Collapse accordion>
-                {course.curriculum.slice(0, 2).map((section, idx) => (
-                  <Panel header={section.section} key={idx}>
+                {(course.curriculum || []).map((section, sIdx) => (
+                  <Panel
+                    header={
+                      //`MODULE ${sIdx + 1} — ${
+                      section.description || section.section || ""
+                      //  }`
+                    }
+                    key={sIdx}
+                  >
                     <List
-                      dataSource={section.lessons}
-                      renderItem={(lesson) => (
-                        <List.Item
-                          className={`px-2 py-3 rounded ${
-                            lesson.locked ? "opacity-50" : ""
-                          }`}
-                        >
-                          <div className="flex items-center space-x-3">
-                            {lesson.locked ? (
-                              <LockOutlined />
-                            ) : (
-                              <PlayCircleOutlined className="text-blue-500" />
-                            )}
-                            <div>
-                              <div className="font-medium text-sm">
-                                {lesson.title}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {lesson.duration}
+                      dataSource={section.lessons || []}
+                      renderItem={(lesson, lIdx) => {
+                        // allow only the very first lesson of the first section to be playable in preview
+                        const isPlayable =
+                          sIdx === 0 &&
+                          lIdx === 0 &&
+                          (lesson.contentUrl || lesson.contentText);
+                        return (
+                          <List.Item
+                            className={`px-2 py-3 rounded ${
+                              !isPlayable
+                                ? "opacity-60 cursor-default"
+                                : "hover:bg-gray-50 cursor-pointer"
+                            }`}
+                            onClick={() => {
+                              if (!isPlayable) return;
+                              // navigate to course detail and instruct it to open this lesson by query
+                              navigate(
+                                `/learner/course-detail/${id}?lesson=${lesson.id}`
+                              );
+                            }}
+                          >
+                            <div className="flex items-center space-x-3">
+                              {isPlayable ? (
+                                <PlayCircleOutlined className="text-blue-500" />
+                              ) : (
+                                <LockOutlined className="text-gray-400" />
+                              )}
+                              <div>
+                                <div className="font-medium text-sm">
+                                  {lesson.title}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {lesson.duration || lesson.durationMinutes
+                                    ? `${
+                                        lesson.duration ||
+                                        lesson.durationMinutes
+                                      } min`
+                                    : lesson.contentType || ""}
+                                </div>
+                                {/* If not playable show content text as preview-only */}
+                                {!isPlayable && lesson.contentText && (
+                                  <div className="text-xs text-gray-400 mt-1">
+                                    {lesson.contentText}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
-                        </List.Item>
-                      )}
+                          </List.Item>
+                        );
+                      }}
                     />
                   </Panel>
                 ))}
@@ -216,10 +272,12 @@ const CoursePreview = () => {
                       size="large"
                       className="w-full h-12 !bg-white !border !border-gray-200 !rounded-xl !font-semibold !text-lg text-gray-800 mt-2"
                       onClick={() =>
-                        useAiStore.getState().summarizeCourseAndShow(id)
+                        useAiStore
+                          .getState()
+                          .summarizeCourseAndShow(id, course?.title)
                       }
                     >
-                      Tóm tắt khóa học này
+                      Summerize This Course
                     </Button>
                   </>
                 )}

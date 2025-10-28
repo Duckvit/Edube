@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { courseData } from "../../utils/mockData";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -22,6 +22,10 @@ import {
   LockOutlined,
   ArrowLeftOutlined,
 } from "@ant-design/icons";
+import { getCourseById } from "../../apis/CourseServices";
+import { getEnrollmentsByLearner } from "../../apis/EnrollmentServices";
+import { useUserStore } from "../../store/useUserStore";
+import useAiStore from "../../store/useAiStore";
 
 const { TextArea } = Input;
 const { Title, Paragraph } = Typography;
@@ -29,13 +33,109 @@ const { Panel } = Collapse;
 
 const CourseDetail = () => {
   const navigate = useNavigate();
-  const { courseId } = useParams();
+  const { id: courseId } = useParams();
   const [activeTab, setActiveTab] = useState("overview");
   const [currentLesson, setCurrentLesson] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const course = courseData[courseId] || courseData.CRS001;
+  const [course, setCourse] = useState(
+    courseData[courseId] || courseData.CRS001
+  );
+  const userData = useUserStore((s) => s.userData);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const res = await getCourseById(courseId);
+        const c = res?.data || res || {};
+
+        const mapped = {
+          id: c.id || c.courseId || c._id || courseId,
+          title: c.title || c.name || "Untitled Course",
+          instructor:
+            c.instructor || c.author || c.mentor?.user?.fullName || "Unknown",
+          description: c.description || c.summary || c.overview || "",
+          rating: c.rating || 5,
+          students: c.totalStudents ?? c.students ?? c.enrolledCount ?? 0,
+          duration:
+            c.duration ||
+            (c.durationHours
+              ? `${c.durationHours}h`
+              : c.hours
+              ? `${c.hours}h`
+              : "") ||
+            0,
+          totalLessons:
+            c.totalLessons ||
+            c.lessons ||
+            (c.sections
+              ? c.sections.reduce((acc, s) => acc + (s.lessons?.length || 0), 0)
+              : 0),
+          curriculum: c.sections || c.curriculum || [],
+          materials: c.materials || [],
+          notes: c.notes || [],
+          qna: c.qna || [],
+        };
+
+        // fetch enrollment for learner to get progress
+        let progressPercentage = 0;
+        try {
+          const learnerId =
+            userData?.id || useUserStore.getState().userData?.id || 1;
+          const enrollments = await getEnrollmentsByLearner(learnerId);
+          const enrollList = Array.isArray(enrollments)
+            ? enrollments
+            : enrollments?.data || enrollments?.content || [];
+          const match = enrollList.find(
+            (e) => String(e.course?.id) === String(mapped.id)
+          );
+          if (match) {
+            progressPercentage = match.progressPercentage ?? 0;
+          }
+        } catch (e) {
+          console.error("Failed to fetch enrollment for course detail", e);
+        }
+
+        // mark lessons as unlocked and compute completed based on progressPercentage
+        const totalLessons =
+          mapped.totalLessons ||
+          (mapped.curriculum || []).reduce(
+            (acc, s) => acc + (s.lessons?.length || 0),
+            0
+          );
+        const completedCount = Math.round(
+          ((progressPercentage || 0) / 100) * (totalLessons || 1)
+        );
+        let assigned = 0;
+        const curriculum = (mapped.curriculum || []).map((section) => {
+          const lessons = (section.lessons || []).map((lesson) => {
+            const completed = assigned < completedCount;
+            assigned += 1;
+            return {
+              ...lesson,
+              locked: false,
+              completed,
+            };
+          });
+          return { ...section, lessons };
+        });
+
+        mapped.curriculum = curriculum;
+        mapped.progress = Math.round(progressPercentage || 0);
+        mapped.completedLessons = completedCount;
+
+        if (mounted) setCourse(mapped);
+      } catch (err) {
+        console.error("Failed to load course detail", err);
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [courseId, userData]);
 
   const OverviewTab = () => (
     <div className="space-y-6">
@@ -264,6 +364,19 @@ const CourseDetail = () => {
                 </span>
               </div>
               <Progress percent={course.progress} className="w-64" />
+              <div className="mt-3 text-right">
+                <Button
+                  size="middle"
+                  onClick={() =>
+                    useAiStore
+                      .getState()
+                      .summarizeCourseAndShow(course.id, course.title)
+                  }
+                  className="!bg-white !border !border-gray-200 !rounded-md !text-sm"
+                >
+                  Summerize This Course
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -330,53 +443,67 @@ const CourseDetail = () => {
             <Card title="Course Curriculum" className="sticky top-4">
               <Collapse
                 accordion
-                items={course.curriculum.map((section, sectionIndex) => ({
-                  key: sectionIndex,
-                  label: (
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">{section.section}</span>
-                      <span className="text-sm text-gray-500">
-                        {section.lessons.filter((l) => l.completed).length}/
-                        {section.lessons.length}
-                      </span>
-                    </div>
-                  ),
-                  children: (
-                    <List
-                      dataSource={section.lessons}
-                      renderItem={(lesson, index) => (
-                        <List.Item
-                          className={`cursor-pointer hover:bg-gray-50 px-2 py-3 rounded ${
-                            lesson.locked ? "opacity-50" : ""
-                          }`}
-                          onClick={() =>
-                            !lesson.locked && setCurrentLesson(index)
+                items={(course.curriculum || []).map(
+                  (section, sectionIndex) => ({
+                    key: sectionIndex,
+                    label: (
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{` 
+                        ${section.description || section.section || ""}
+                        `}</span>
+                        <span className="text-sm text-gray-500">
+                          {
+                            (section.lessons || []).filter((l) => l.completed)
+                              .length
                           }
-                        >
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center space-x-3">
-                              {lesson.locked ? (
-                                <LockOutlined className="text-gray-400" />
-                              ) : lesson.completed ? (
-                                <CheckCircleOutlined className="text-green-500" />
-                              ) : (
-                                <PlayCircleOutlined className="text-blue-500" />
-                              )}
-                              <div>
-                                <div className="font-medium text-sm">
-                                  {lesson.title}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {lesson.duration}
+                          /{(section.lessons || []).length}
+                        </span>
+                      </div>
+                    ),
+                    children: (
+                      <div>
+                        {section.description && (
+                          <div className="mb-3 text-sm text-gray-600">
+                            {section.description}
+                          </div>
+                        )}
+                        <List
+                          dataSource={section.lessons || []}
+                          renderItem={(lesson, index) => (
+                            <List.Item
+                              className={`cursor-pointer hover:bg-gray-50 px-2 py-3 rounded ${
+                                lesson.locked ? "opacity-50" : ""
+                              }`}
+                              onClick={() =>
+                                !lesson.locked && setCurrentLesson(index)
+                              }
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <div className="flex items-center space-x-3">
+                                  {lesson.locked ? (
+                                    <LockOutlined className="text-gray-400" />
+                                  ) : lesson.completed ? (
+                                    <CheckCircleOutlined className="text-green-500" />
+                                  ) : (
+                                    <PlayCircleOutlined className="text-blue-500" />
+                                  )}
+                                  <div>
+                                    <div className="font-medium text-sm">
+                                      {lesson.title}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {lesson.duration}
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </div>
-                        </List.Item>
-                      )}
-                    />
-                  ),
-                }))}
+                            </List.Item>
+                          )}
+                        />
+                      </div>
+                    ),
+                  })
+                )}
               />
             </Card>
           </div>

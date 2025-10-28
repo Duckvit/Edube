@@ -32,6 +32,8 @@ import {
   SettingOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { useUserStore } from "../../store/useUserStore";
+import { getEnrollmentsByLearner } from "../../apis/EnrollmentServices";
 import { Brain } from "lucide-react";
 
 const { Search } = Input;
@@ -48,6 +50,7 @@ export const LearnerDashboard = () => {
   // Use reactive course store (replaces static mock imports)
   const allCourses = useCourseStore((s) => s.allCourses);
   const enrolledCourses = useCourseStore((s) => s.enrolledCourses);
+  const userData = useUserStore((s) => s.userData);
 
   // Fetch courses from API on mount and populate store
   useEffect(() => {
@@ -63,19 +66,43 @@ export const LearnerDashboard = () => {
           key: c.key || String(idx + 1),
           id: c.id || c.courseId || c._id || `API_${idx}`,
           title: c.title || c.name || "Untitled Course",
-          instructor: c.instructor || c.author || "Unknown",
+          instructor: c.mentor.user.fullName || "Unknown",
           category: c.category || "General",
           level: c.level || "All",
           rating: c.rating || 5,
-          students: c.students || c.enrolledCount || 0,
+          // prefer API fields: totalStudents and durationHours
+          students: c.totalStudents ?? c.students ?? c.enrolledCount ?? 0,
           price: c.price || c.fee || 0,
-          duration: c.duration || (c.hours ? `${c.hours} hours` : ""),
+          duration:
+            c.duration ||
+            (c.durationHours
+              ? `${c.durationHours}h`
+              : c.hours
+              ? `${c.hours}h`
+              : ""),
           lessons: c.lessons || c.totalLessons || 0,
           enrolled: !!c.enrolled || false,
           thumbnail: c.thumbnail || c.image || null,
         }));
 
-        if (mounted) useCourseStore.getState().setAllCourses(mapped);
+        if (mounted) {
+          useCourseStore.getState().setAllCourses(mapped);
+
+          // load enrollments for current learner and populate enrolled list
+          try {
+            const learnerId =
+              userData?.id || useUserStore.getState().userData?.id || 1;
+            const enrollments = await getEnrollmentsByLearner(learnerId);
+            // enrollments may be array or wrapped in data
+            const enrollPayload = Array.isArray(enrollments)
+              ? enrollments
+              : enrollments?.data || enrollments?.content || [];
+            useCourseStore.getState().setEnrolledFromApi(enrollPayload);
+          } catch (e) {
+            // ignore enrollment errors for now
+            console.error("Failed to load enrollments", e);
+          }
+        }
       } catch (err) {
         console.error("getAllCourses failed", err);
       }
@@ -235,7 +262,7 @@ export const LearnerDashboard = () => {
                   )}
                 </div>
                 <div className="text-xs text-gray-500 mb-4">
-                  Last accessed: {course.lastAccessed}
+                  Last accessed: {course.lastAccessed ? course.lastAccessed.slice(0, 10) : "N/A"}
                 </div>
                 <div className="mt-auto">
                   <Button
@@ -369,11 +396,11 @@ export const LearnerDashboard = () => {
                   {course.lessons} lessons • {course.duration}
                 </div>
                 <div className="mb-4" style={{ minHeight: "28px" }}>
-                  {!course.enrolled && (
+                  {/* {!course.enrolled && (
                     <div className="text-lg font-bold text-green-600">
                       ${course.price}
                     </div>
-                  )}
+                  )} */}
                 </div>
                 <div className="mt-auto">
                   <Button

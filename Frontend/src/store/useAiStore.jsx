@@ -45,10 +45,15 @@ export const useAiStore = create((set, get) => ({
   },
 
   // request a course summarize and push AI response
-  summarizeCourseAndShow: async (courseId) => {
+  // accepts courseId and optional courseTitle so UI shows the course name
+  summarizeCourseAndShow: async (courseId, courseTitle) => {
     const learnerId = useUserStore.getState().userData?.id || 1;
     get().open();
-    get().pushMessage({ sender: "user", text: `Tóm tắt khoá học ${courseId}` });
+    const titleText = courseTitle || courseId;
+    get().pushMessage({
+      sender: "user",
+      text: `Tóm tắt khoá học ${titleText}`,
+    });
     // show loading indicator for summarization as well
     set({ loading: true });
     try {

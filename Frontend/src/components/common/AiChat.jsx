@@ -124,7 +124,7 @@ export default function AiChat() {
                   <div
                     className={`max-w-[75%] rounded-2xl px-4 py-2 ${
                       message.sender === "user"
-                        ? "bg-gradient-to-r from-green-500 to-green-600 text-white rounded-tr-sm"
+                        ? "bg-gradient-to-r from-green-400 to-green-400 text-white rounded-tr-sm"
                         : "bg-white text-gray-800 shadow-sm rounded-tl-sm border border-gray-100"
                     }`}
                   >

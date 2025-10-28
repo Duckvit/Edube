@@ -69,6 +69,45 @@ export const useCourseStore = create((set, get) => ({
     set({ allCourses: courses, enrolledCourses: enrolled });
   },
 
+  // populate enrolledCourses from enrollment API response
+  setEnrolledFromApi: (enrollments) => {
+    // enrollments: [{ id, learner: {id}, course: { id }, amountPaid, enrollmentDate, status, progressPercentage, lastAccessed, completedAt }]
+    const { allCourses } = get();
+    const enrolled = (enrollments || []).map((e, idx) => {
+      const courseId = e.course?.id || e.courseId || e.courseId;
+      // find corresponding course in allCourses for title/duration
+      const found = allCourses.find((c) => String(c.id) === String(courseId));
+      // mark course as enrolled in allCourses if found
+      if (found) found.enrolled = true;
+
+      const totalLessons = found?.lessons || found?.totalLessons || 0;
+      const progress = e.progressPercentage ?? 0;
+      const completedLessons = Math.round(
+        (progress / 100) * (totalLessons || 1)
+      );
+
+      return {
+        key: String(idx + 1),
+        id: courseId,
+        title: found?.title || `Course ${courseId}`,
+        instructor: found?.instructor || "Unknown",
+        category: found?.category || "General",
+        level: found?.level || "All",
+        progress: Math.round(progress),
+        status: e.status || "active",
+        rating: found?.rating || 0,
+        totalLessons: totalLessons,
+        completedLessons: completedLessons,
+        duration: found?.duration || "",
+        lastAccessed: e.lastAccessed || "Never",
+        thumbnail: found?.thumbnail || null,
+        amountPaid: e.amountPaid || 0,
+      };
+    });
+
+    set({ allCourses: [...allCourses], enrolledCourses: enrolled });
+  },
+
   // helper to get course by id from allCourses
   getCourseById: (courseId) => {
     const { allCourses } = get();

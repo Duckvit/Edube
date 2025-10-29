@@ -12,6 +12,7 @@ import {
 import useAiStore from "../../store/useAiStore";
 import { useUserStore } from "../../store/useUserStore";
 import { getCourseById as fetchCourseById } from "../../apis/CourseServices";
+import { getFreeEnrollments } from "../../apis/EnrollmentServices";
 
 const { Panel } = Collapse;
 
@@ -80,8 +81,6 @@ const CoursePreview = () => {
   const handleEnroll = async (courseId) => {
     try {
       const token = localStorage.getItem("token");
-      console.log(token);
-
       if (!token) {
         toast.error("Please log in before enrolling");
         return;
@@ -120,17 +119,24 @@ const CoursePreview = () => {
       }
 
       const payload = { courseId };
-      const res = await createPayment(payload, token);
 
-      if (res?.checkoutUrl) {
-        toast.success("Redirecting to payment...");
-        window.location.href = res.checkoutUrl;
+      // Kiểm tra free course
+      if (course?.price === 0 || !course?.price) {
+        await getFreeEnrollments(token, payload);
+        toast.success("Enrolled successfully. Redirecting to course...");
+        navigate(`/learner/course-detail/${courseId}`);
       } else {
-        toast.error("Failed to create payment link");
+        const res = await createPayment(payload, token);
+        if (res?.checkoutUrl) {
+          toast.success("Redirecting to payment...");
+          window.location.replace(res.checkoutUrl);
+        } else {
+          toast.error("Failed to create payment link");
+        }
       }
     } catch (error) {
       console.error(error);
-      toast.error("Error creating payment link");
+      toast.error("Error during enrollment");
     }
   };
 
@@ -329,7 +335,9 @@ const CoursePreview = () => {
                       className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-yellow-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-yellow-700 !text-white"
                       onClick={() => handleEnroll(course.id)}
                     >
-                      Buy - {course.price ? `${course.price} VNĐ` : "Free"}
+                      {course.price && course.price > 0
+                        ? `Buy - ${course.price.toLocaleString("vi-VN")} VNĐ`
+                        : "Enroll for Free"}
                     </Button>
 
                     <Button

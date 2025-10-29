@@ -3,6 +3,7 @@ import {
   getSectionByCourseId,
   createSection,
 } from "../../apis/SectionServices";
+import { getCourseById as fetchCourseById } from "../../apis/CourseServices";
 import { toast } from "react-toastify";
 import {
   Card,

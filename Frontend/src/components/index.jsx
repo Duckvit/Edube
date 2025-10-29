@@ -27,5 +27,6 @@ export { default as CourseDetail } from "./learner/CourseDetail";
 export { default as CoursePreview } from "./learner/CoursePreview";
 export { default as PaymentSuccess } from "./learner/PaymentSuccess";
 export { default as PaymentFail } from "./learner/PaymentFail";
+export { default as Search } from "./learner/Search";
 //export { default as CoursePreview } from './learner/CoursePreview';
 //export { default as PaymentPage } from './learner/PaymentPage';

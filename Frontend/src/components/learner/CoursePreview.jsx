@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, Button, Rate, Collapse, List } from "antd";
+import { createPayment } from "../../apis/PaymentServices";
+import { toast } from "react-toastify";
 import {
   PlayCircleOutlined,
   LockOutlined,
@@ -72,6 +74,31 @@ const CoursePreview = () => {
 
     loadCourse();
   }, [id]);
+
+  const handleEnroll = async (courseId) => {
+    try {
+      const token = localStorage.getItem("token");
+      console.log(token);
+
+      if (!token) {
+        toast.error("Please log in before enrolling");
+        return;
+      }
+
+      const payload = { courseId };
+      const res = await createPayment(payload, token);
+
+      if (res?.checkoutUrl) {
+        toast.success("Redirecting to payment...");
+        window.location.href = res.checkoutUrl;
+      } else {
+        toast.error("Failed to create payment link");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error creating payment link");
+    }
+  };
 
   if (loading)
     return (
@@ -266,9 +293,9 @@ const CoursePreview = () => {
                     <Button
                       size="large"
                       className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-yellow-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-yellow-700 !text-white"
-                      onClick={() => navigate(`/learner/payment/${id}`)}
+                      onClick={() => handleEnroll(course.id)}
                     >
-                      Buy - {course.price ? `${course.price} USD` : "Free"}
+                      Buy - {course.price ? `${course.price} VNĐ` : "Free"}
                     </Button>
 
                     <Button

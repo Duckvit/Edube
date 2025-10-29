@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 // previous static import (kept for reference):
 // import { enrolledCourses, allCourses } from "../../utils/mockData";
 import { getAllCourses } from "../../apis/CourseServices";
 import { createPayment } from "../../apis/PaymentServices";
+import { getEnrollmentsByLearner } from "../../apis/EnrollmentServices";
 import { toast } from "react-toastify";
 import {
   Card,
@@ -27,10 +28,8 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useUserStore } from "../../store/useUserStore";
-import { getEnrollmentsByLearner } from "../../apis/EnrollmentServices";
 import { Brain } from "lucide-react";
 
-const { Search } = Input;
 const { Option } = Select;
 
 export const LearnerDashboard = () => {
@@ -47,6 +46,17 @@ export const LearnerDashboard = () => {
   const [enrolledCourses, setEnrolledCourses] = useState([]);
 
   const userData = useUserStore((s) => s.userData);
+  const searchInputRef = useRef(null);
+
+  const handleSearchChange = (e) => {
+    setSearchText(e.target.value);
+    // Đảm bảo input vẫn có focus
+    setTimeout(() => {
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
+    }, 0);
+  };
 
   useEffect(() => {
     const fetchAllCourses = async () => {
@@ -59,16 +69,12 @@ export const LearnerDashboard = () => {
 
         setLoading(true);
         const data = await getAllCourses(0, 10, token);
-        console.log("📘 API response:", data);
+        console.log("📘 API response getAllCourses:", data);
 
-        // ✅ Lưu danh sách khóa học đúng cách
         const coursesData = data?.content || [];
-        console.log("📘 Courses data:", coursesData);
-        console.log("📘 First course:", coursesData[0]);
-        setCourses(coursesData);
         setAllCourses(coursesData);
       } catch (err) {
-        console.error("Lỗi khi gọi API:", err);
+        console.error("Lỗi khi gọi API All Courses:", err);
         setError(err.message || "Đã xảy ra lỗi");
       } finally {
         setLoading(false);
@@ -76,6 +82,60 @@ export const LearnerDashboard = () => {
     };
 
     fetchAllCourses();
+  }, []);
+
+  useEffect(() => {
+    const fetchEnrollCourses = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const learnerId =
+          userData?.id || useUserStore.getState().userData?.id || 1;
+        if (!token || !learnerId) {
+          setError("Thiếu token hoặc learnerId");
+          return;
+        }
+
+        setLoading(true);
+        const data = await getEnrollmentsByLearner(learnerId, token);
+        console.log("📘 Enrolled Courses API response:", data);
+
+        // Dữ liệu API trả về là 1 array chứa enrollments
+        const enrollments = Array.isArray(data)
+          ? data
+          : data?.content || data?.data || [];
+
+        // ✅ Map để lấy ra thông tin course trong từng enrollment
+        const mappedCourses = enrollments.map((enroll) => {
+          const c = enroll.course;
+          return {
+            enrollmentId: enroll.id,
+            id: c.id,
+            title: c.title || "Untitled Course",
+            mentor: c.mentor?.user?.fullName || "Unknown",
+            category: c.category || "General",
+            level: c.level || "All",
+            price: c.price || 0,
+            students: c.totalStudents || 0,
+            duration: c.durationHours ? `${c.durationHours}h` : "",
+            lessons: c.totalLessons || 0,
+            thumbnail: c.thumbnail || c.image || null,
+            progress: enroll.progressPercentage || 0,
+            status: enroll.status,
+            enrolledAt: enroll.enrollmentDate,
+          };
+        });
+
+        setEnrolledCourses(mappedCourses);
+        console.log("✅ mapped enrolled courses:", mappedCourses);
+      } catch (err) {
+        console.error("Lỗi khi gọi API Enrolled Courses:", err);
+        setError(err.message || "Đã xảy ra lỗi");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEnrollCourses();
   }, []);
 
   const handleEnroll = async (courseId) => {
@@ -142,21 +202,24 @@ export const LearnerDashboard = () => {
     return true;
   });
 
-  const filteredAllCourses = allCourses.filter((course) => {
-    const matchesSearch =
-      course.title.toLowerCase().includes(searchText.toLowerCase()) ||
-      (course.mentor?.user?.username || "")
-        .toLowerCase()
-        .includes(searchText.toLowerCase());
-    const matchesCategory =
-      categoryFilter === "all" || course.category === categoryFilter;
-    const matchesLevel = levelFilter === "all" || course.level === levelFilter;
+  const filteredAllCourses = useMemo(() => {
+    return allCourses.filter((course) => {
+      const matchesSearch =
+        course.title.toLowerCase().includes(searchText.toLowerCase()) ||
+        (course.mentor?.user?.username || "")
+          .toLowerCase()
+          .includes(searchText.toLowerCase());
+      const matchesCategory =
+        categoryFilter === "all" || course.category === categoryFilter;
+      const matchesLevel =
+        levelFilter === "all" || course.level === levelFilter;
 
-    return matchesSearch && matchesCategory && matchesLevel;
-  });
+      return matchesSearch && matchesCategory && matchesLevel;
+    });
+  }, [allCourses, searchText, categoryFilter, levelFilter]);
 
-  console.log("📘 All courses:", allCourses);
-  console.log("📘 Filtered courses:", filteredAllCourses);
+  // console.log("📘 All courses:", allCourses);
+  // console.log("📘 Filtered courses:", filteredAllCourses);
 
   const categories = [...new Set(allCourses.map((course) => course.category))];
   const levels = [...new Set(allCourses.map((course) => course.level))];
@@ -204,8 +267,14 @@ export const LearnerDashboard = () => {
 
       {/* Course Grid */}
       <Row gutter={[16, 16]}>
-        {filteredEnrolledCourses.map((course) => (
-          <Col xs={24} sm={12} lg={8} xl={6} key={course.key}>
+        {filteredEnrolledCourses.map((enroll) => (
+          <Col
+            xs={24}
+            sm={12}
+            lg={8}
+            xl={6}
+            key={enroll.id || enroll.course?.id}
+          >
             <Card
               hoverable
               className="h-full flex flex-col"
@@ -226,16 +295,16 @@ export const LearnerDashboard = () => {
               <div className="flex flex-col h-full">
                 <div className="mb-2">
                   <Tag
-                    color={getStatusColor(course.status)}
-                    icon={getStatusIcon(course.status)}
+                    color={getStatusColor(enroll.status)}
+                    icon={getStatusIcon(enroll.status)}
                   >
-                    {course.status.replace("-", " ").toUpperCase()}
+                    {enroll.status.replace("-", " ").toUpperCase()}
                   </Tag>
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
-                  {course.title}
+                  {enroll.title}
                 </h3>
-                <p className="text-sm text-gray-600 mb-2">by {course.mentor}</p>
+                <p className="text-sm text-gray-600 mb-2">by {enroll.mentor}</p>
                 {/* <div className="flex items-center mb-2">
                   <Rate
                     disabled
@@ -248,25 +317,23 @@ export const LearnerDashboard = () => {
                   </span>
                 </div> */}
                 <div className="text-sm text-gray-600 mb-3">
-                  {course.completedLessons}/{course.totalLessons} lessons •{" "}
-                  {course.duration}
+                  {enroll.completedLessons || 0}/{enroll.lessons} lessons •{" "}
+                  {enroll.duration}
                 </div>
                 <div className="mb-3" style={{ minHeight: "52px" }}>
-                  {course.status !== "saved" && (
+                  {enroll.status !== "saved" && (
                     <div>
                       <div className="flex justify-between text-sm mb-1">
                         <span>Progress</span>
-                        <span>{course.progress}%</span>
+                        <span>{enroll.progress}%</span>
                       </div>
-                      <Progress percent={course.progress} size="small" />
+                      <Progress percent={enroll.progress} size="small" />
                     </div>
                   )}
                 </div>
                 <div className="text-xs text-gray-500 mb-4">
-                  Last accessed:{" "}
-                  {course.lastAccessed
-                    ? course.lastAccessed.slice(0, 10)
-                    : "N/A"}
+                  Enrolled at:{" "}
+                  {enroll.enrolledAt ? enroll.enrolledAt.slice(0, 10) : "N/A"}
                 </div>
                 <div className="mt-auto">
                   <Button
@@ -274,11 +341,11 @@ export const LearnerDashboard = () => {
                     block
                     size="large"
                     className="bg-blue-600 font-medium"
-                    onClick={() => handleContinueCourse(course.id)}
+                    onClick={() => handleContinueCourse(enroll.id)}
                   >
-                    {course.status === "completed"
+                    {enroll.status === "completed"
                       ? "Review"
-                      : course.status === "saved"
+                      : enroll.status === "saved"
                       ? "Start Learning"
                       : "Continue"}
                   </Button>
@@ -301,19 +368,26 @@ export const LearnerDashboard = () => {
     </div>
   );
 
-  const AllCoursesTab = () => (
+  const AllCoursesTab = React.memo(() => (
     <div>
       {/* Search and Filters */}
       <Card className="mb-6">
         <div className="flex flex-col md:flex-row gap-4 items-center">
-          <Search
+          <Input
+            ref={searchInputRef}
             placeholder="Search courses by title or instructor"
             allowClear
-            enterButton={<SearchOutlined />}
+            prefix={<SearchOutlined />}
             size="large"
             className="flex-1"
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
+            onChange={handleSearchChange}
+            onPressEnter={() => {
+              // Giữ focus sau khi nhấn Enter
+              if (searchInputRef.current) {
+                searchInputRef.current.focus();
+              }
+            }}
           />
           <div className="flex gap-2">
             <Select
@@ -440,7 +514,7 @@ export const LearnerDashboard = () => {
                     onClick={() =>
                       course.enrolled
                         ? handleContinueCourse(course.id)
-                        : handleEnroll(course.id)
+                        : navigate(`/learner/course-preview/${course.id}`)
                     }
                   >
                     {course.enrolled ? "Go to Course" : `Enroll `}
@@ -460,7 +534,7 @@ export const LearnerDashboard = () => {
         </div>
       )}
     </div>
-  );
+  ));
 
   const tabItems = [
     {

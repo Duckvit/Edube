@@ -1,8 +1,6 @@
-import axiosConfig from '../axiosConfig';
+import axiosConfig from "../axiosConfig";
 
 export const createMentor = async (data, token) => {
-    const res = await axiosConfig.post(`/api/auth/create-mentor`, data, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
-    return res;
-}
+  const res = await axiosConfig.post(`/api/auth/create-mentor`, data);
+  return res;
+};

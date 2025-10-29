@@ -1,8 +1,6 @@
-import axiosConfig from '../axiosConfig';
+import axiosConfig from "../axiosConfig";
 
 export const createLearner = async (data, token) => {
-    const res = await axiosConfig.post(`/api/learners`, data, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
-    return res;
-}
+  const res = await axiosConfig.post(`/api/learners`, data);
+  return res;
+};

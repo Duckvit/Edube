@@ -374,7 +374,7 @@ const CourseDetail = () => {
                   }
                   className="!bg-white !border !border-gray-200 !rounded-md !text-sm"
                 >
-                  Summerize This Course
+                  Summarize This Course
                 </Button>
               </div>
             </div>

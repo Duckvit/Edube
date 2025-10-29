@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, Button, Rate, Collapse, List } from "antd";
 import { createPayment } from "../../apis/PaymentServices";
+import { createEnrollment } from "../../apis/EnrollmentServices";
 import { toast } from "react-toastify";
 import {
   PlayCircleOutlined,
@@ -9,6 +10,7 @@ import {
   ArrowLeftOutlined,
 } from "@ant-design/icons";
 import useAiStore from "../../store/useAiStore";
+import { useUserStore } from "../../store/useUserStore";
 import { getCourseById as fetchCourseById } from "../../apis/CourseServices";
 
 const { Panel } = Collapse;
@@ -82,6 +84,38 @@ const CoursePreview = () => {
 
       if (!token) {
         toast.error("Please log in before enrolling");
+        return;
+      }
+
+      // if course is free (price 0), create enrollment directly
+      if (!course) {
+        toast.error("Course data not loaded");
+        return;
+      }
+
+      const priceNum = Number(course.price || 0);
+      if (priceNum === 0) {
+        // create enrollment directly
+        const learnerId =
+          useUserStore.getState().userData?.id ||
+          Number(localStorage.getItem("learnerId")) ||
+          1;
+        const payload = {
+          learner: { id: learnerId },
+          course: { id: courseId },
+          amountPaid: 0.0,
+          status: "active",
+          progressPercentage: 0.0,
+        };
+
+        const res = await createEnrollment(payload, token);
+        if (res?.id) {
+          toast.success("Enrolled successfully. Redirecting to course...");
+          navigate(`/learner/course-detail/${courseId}`);
+        } else {
+          console.error("Enrollment API returned unexpected response", res);
+          toast.error("Failed to enroll");
+        }
         return;
       }
 
@@ -307,7 +341,7 @@ const CoursePreview = () => {
                           .summarizeCourseAndShow(id, course?.title)
                       }
                     >
-                      Summerize This Course
+                      Summarize This Course
                     </Button>
                   </>
                 )}

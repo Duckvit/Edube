@@ -38,11 +38,10 @@ const CourseDetail = () => {
   const [currentLesson, setCurrentLesson] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-
-  const [course, setCourse] = useState(
-    courseData[courseId] || courseData.CRS001
-  );
+  const [course, setCourse] = useState("");
   const userData = useUserStore((s) => s.userData);
+  const firstSection = course.curriculum?.[0];
+  const firstLesson = firstSection?.lessons?.[currentLesson];
 
   useEffect(() => {
     let mounted = true;
@@ -62,9 +61,9 @@ const CourseDetail = () => {
           duration:
             c.duration ||
             (c.durationHours
-              ? `${c.durationHours}h`
+              ? `${c.durationHours} hours`
               : c.hours
-              ? `${c.hours}h`
+              ? `${c.hours} hours`
               : "") ||
             0,
           totalLessons:
@@ -143,7 +142,7 @@ const CourseDetail = () => {
         <Paragraph className="text-gray-600 text-base leading-relaxed">
           {course.description}
         </Paragraph>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">
               {course.totalLessons}
@@ -158,16 +157,16 @@ const CourseDetail = () => {
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-purple-600">
-              {course.students.toLocaleString()}
+              {course.students?.toLocaleString()}
             </div>
             <div className="text-sm text-gray-600">Students</div>
           </div>
-          <div className="text-center">
+          {/* <div className="text-center">
             <div className="text-2xl font-bold text-orange-600">
               {course.rating}/5
             </div>
             <div className="text-sm text-gray-600">Rating</div>
-          </div>
+          </div> */}
         </div>
       </Card>
 
@@ -181,7 +180,7 @@ const CourseDetail = () => {
           <div>
             <h3 className="text-lg font-semibold">{course.instructor}</h3>
             <p className="text-gray-600">Senior Software Engineer & Educator</p>
-            <Rate disabled defaultValue={5} className="text-sm mt-1" />
+            {/* <Rate disabled defaultValue={5} className="text-sm mt-1" /> */}
           </div>
         </div>
       </Card>
@@ -301,21 +300,21 @@ const CourseDetail = () => {
       label: "Overview",
       children: <OverviewTab />,
     },
-    {
-      key: "materials",
-      label: "Materials",
-      children: <MaterialsTab />,
-    },
-    {
-      key: "notes",
-      label: "Notes",
-      children: <NotesTab />,
-    },
-    {
-      key: "qa",
-      label: "Q&A",
-      children: <QATab />,
-    },
+    // {
+    //   key: "materials",
+    //   label: "Materials",
+    //   children: <MaterialsTab />,
+    // },
+    // {
+    //   key: "notes",
+    //   label: "Notes",
+    //   children: <NotesTab />,
+    // },
+    // {
+    //   key: "qa",
+    //   label: "Q&A",
+    //   children: <QATab />,
+    // },
   ];
 
   const handleTimeUpdate = (e) => {
@@ -332,7 +331,7 @@ const CourseDetail = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div className="flex-1">
               <button
-                onClick={() => navigate("/learner")}
+                onClick={() => navigate(-1)}
                 className="flex items-center gap-2 text-blue-600 hover:underline cursor-pointer"
               >
                 <ArrowLeftOutlined />
@@ -343,7 +342,7 @@ const CourseDetail = () => {
               </h1>
               <p className="text-gray-600 mb-4">by {course.instructor}</p>
               <div className="flex items-center space-x-6 text-sm text-gray-600">
-                <div className="flex items-center">
+                {/* <div className="flex items-center">
                   <Rate
                     disabled
                     defaultValue={course.rating}
@@ -351,8 +350,8 @@ const CourseDetail = () => {
                     className="text-xs mr-2"
                   />
                   <span>{course.rating}</span>
-                </div>
-                <span>{course.students.toLocaleString()} students</span>
+                </div> */}
+                <span>{course.students?.toLocaleString()} students</span>
                 <span>{course.duration}</span>
               </div>
             </div>
@@ -393,7 +392,6 @@ const CourseDetail = () => {
     ${!isPlaying ? "bg-black" : ""}`}
               >
                 {!isPlaying ? (
-                  // Thumbnail + nút play
                   <div
                     className="flex flex-col items-center justify-center text-white cursor-pointer"
                     onClick={() => setIsPlaying(true)}
@@ -402,7 +400,7 @@ const CourseDetail = () => {
                     <p className="mt-4 text-lg font-semibold">Video Player</p>
                     <p className="text-sm opacity-75">
                       Lesson {currentLesson + 1}:{" "}
-                      {course.curriculum[0]?.lessons[currentLesson]?.title}
+                      {firstLesson?.title || "No lesson available"}
                     </p>
                   </div>
                 ) : (

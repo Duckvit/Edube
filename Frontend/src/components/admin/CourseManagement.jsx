@@ -1,4 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { formatDate } from "../../utils/formatDate";
+import { getAllCourses, activeCourse } from "../../apis/CourseServices";
 import {
   Card,
   Table,
@@ -33,183 +37,51 @@ const CourseManagement = () => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const [loading, setLoading] = useState(false);
+  const [allCourses, setAllCourses] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const navigate = useNavigate();
 
-  const courseData = [
-    {
-      key: "1",
-      id: "CRS001",
-      title: "Advanced React Development",
-      instructor: "Dr. Sarah Chen",
-      instructorEmail: "sarah.chen@university.edu",
-      category: "Programming",
-      status: "approved",
-      students: 1247,
-      rating: 4.9,
-      price: 99.99,
-      duration: "12 hours",
-      lessons: 24,
-      createdDate: "2023-11-20",
-      lastUpdated: "2024-01-15",
-    },
-    {
-      key: "2",
-      id: "CRS002",
-      title: "Machine Learning Fundamentals",
-      instructor: "Prof. Michael Rodriguez",
-      instructorEmail: "michael.rodriguez@college.edu",
-      category: "Data Science",
-      status: "approved",
-      students: 856,
-      rating: 4.8,
-      price: 149.99,
-      duration: "18 hours",
-      lessons: 32,
-      createdDate: "2023-09-05",
-      lastUpdated: "2024-01-10",
-    },
-    {
-      key: "3",
-      id: "CRS003",
-      title: "Digital Marketing Strategy",
-      instructor: "Lisa Thompson",
-      instructorEmail: "lisa.thompson@business.com",
-      category: "Marketing",
-      status: "pending",
-      students: 0,
-      rating: 0,
-      price: 79.99,
-      duration: "8 hours",
-      lessons: 16,
-      createdDate: "2024-01-18",
-      lastUpdated: "2024-01-18",
-    },
-    {
-      key: "4",
-      id: "CRS004",
-      title: "Python for Beginners",
-      instructor: "David Park",
-      instructorEmail: "david.park@tech.com",
-      category: "Programming",
-      status: "approved",
-      students: 2103,
-      rating: 4.7,
-      price: 59.99,
-      duration: "10 hours",
-      lessons: 20,
-      createdDate: "2023-08-20",
-      lastUpdated: "2024-01-12",
-    },
-    {
-      key: "5",
-      id: "CRS005",
-      title: "Advanced JavaScript Concepts",
-      instructor: "Alex Kumar",
-      instructorEmail: "alex.kumar@email.com",
-      category: "Programming",
-      status: "rejected",
-      students: 0,
-      rating: 0,
-      price: 89.99,
-      duration: "15 hours",
-      lessons: 28,
-      createdDate: "2024-01-10",
-      lastUpdated: "2024-01-16",
-    },
-    {
-      key: "6",
-      id: "CRS006",
-      title: "UI/UX Design Principles",
-      instructor: "Emma Wilson",
-      instructorEmail: "emma.wilson@design.com",
-      category: "Design",
-      status: "pending",
-      students: 0,
-      rating: 0,
-      price: 119.99,
-      duration: "14 hours",
-      lessons: 25,
-      createdDate: "2024-01-19",
-      lastUpdated: "2024-01-19",
-    },
-    {
-      key: "7",
-      id: "CRS007",
-      title: "Data Analysis with Excel",
-      instructor: "Maria Garcia",
-      instructorEmail: "maria.garcia@analytics.com",
-      category: "Data Science",
-      status: "approved",
-      students: 1456,
-      rating: 4.6,
-      price: 69.99,
-      duration: "9 hours",
-      lessons: 18,
-      createdDate: "2023-12-01",
-      lastUpdated: "2024-01-08",
-    },
-    {
-      key: "8",
-      id: "CRS008",
-      title: "Mobile App Development",
-      instructor: "John Smith",
-      instructorEmail: "john.smith@mobile.com",
-      category: "Programming",
-      status: "pending",
-      students: 0,
-      rating: 0,
-      price: 129.99,
-      duration: "20 hours",
-      lessons: 35,
-      createdDate: "2024-01-17",
-      lastUpdated: "2024-01-17",
-    },
-  ];
+  useEffect(() => {
+    const fetchAllCourses = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setError("Token không tồn tại");
+          return;
+        }
 
-  const getActionItems = (record) => [
-    {
-      key: "view",
-      label: "View Details",
-      icon: <EyeOutlined />,
-      onClick: () => console.log("View course:", record.id),
-    },
-    {
-      key: "edit",
-      label: "Edit Course",
-      icon: <EditOutlined />,
-      onClick: () => console.log("Edit course:", record.id),
-    },
-    ...(record.status === "pending"
-      ? [
-          {
-            key: "approve",
-            label: "Approve Course",
-            icon: <CheckCircleOutlined />,
-            onClick: () => console.log("Approve course:", record.id),
-          },
-          {
-            key: "reject",
-            label: "Reject Course",
-            icon: <CloseCircleOutlined />,
-            onClick: () => console.log("Reject course:", record.id),
-          },
-        ]
-      : []),
-    {
-      key: "delete",
-      label: "Delete Course",
-      icon: <DeleteOutlined />,
-      danger: true,
-      onClick: () => {
-        Modal.confirm({
-          title: "Delete Course",
-          content: `Are you sure you want to delete "${record.title}"?`,
-          okText: "Delete",
-          okType: "danger",
-          onOk: () => console.log("Delete course:", record.id),
-        });
-      },
-    },
-  ];
+        setLoading(true);
+        const data = await getAllCourses(currentPage - 1, pageSize, token);
+        console.log("📘 API response getAllCourses:", data);
+
+        const coursesData = data?.content || [];
+        setAllCourses(coursesData);
+
+        // Set total items từ response (Spring Boot Page format)
+        setTotalItems(data?.totalElements || data?.total || 0);
+      } catch (err) {
+        console.error("Lỗi khi gọi API All Courses:", err);
+        setError(err.message || "Đã xảy ra lỗi");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllCourses();
+  }, [currentPage, pageSize]);
+
+  const handleActiveCourse = async (id) => {
+    try {
+      const token = localStorage.getItem("token");
+      await activeCourse(id, token);
+      toast.success("Active Course successfully!");
+    } catch (err) {
+      console.error("Lỗi khi kích hoạt:", err);
+      toast.error("Active Course failed!");
+    }
+  };
 
   const columns = [
     {
@@ -235,13 +107,15 @@ const CourseManagement = () => {
       width: 300,
     },
     {
-      title: "Instructor",
-      dataIndex: "instructor",
-      key: "instructor",
-      render: (text, record) => (
+      title: "Mentor",
+      dataIndex: "mentor",
+      key: "mentor",
+      render: (mentor) => (
         <div>
-          <div className="font-medium text-gray-900">{text}</div>
-          <div className="text-sm text-gray-500">{record.instructorEmail}</div>
+          <div className="font-medium text-gray-900">
+            {mentor?.user?.fullName || "Unknown"}
+          </div>
+          {/* <div className="text-sm text-gray-500">{mentor.email || ""}</div> */}
         </div>
       ),
     },
@@ -251,14 +125,14 @@ const CourseManagement = () => {
       key: "status",
       render: (status) => {
         const colors = {
-          approved: "green",
-          pending: "orange",
-          rejected: "red",
+          active: "green",
+          inactive: "orange",
+          deleted: "red",
         };
         const icons = {
-          approved: <CheckCircleOutlined />,
-          pending: <CloseCircleOutlined />,
-          rejected: <CloseCircleOutlined />,
+          active: <CheckCircleOutlined />,
+          inactive: <CloseCircleOutlined />,
+          deleted: <CloseCircleOutlined />,
         };
         return (
           <Tag color={colors[status]} icon={icons[status]}>
@@ -268,38 +142,40 @@ const CourseManagement = () => {
       },
     },
     {
-      title: "Students",
-      dataIndex: "students",
-      key: "students",
-      render: (students) => (
+      title: "Learners",
+      dataIndex: "totalStudents",
+      key: "learners",
+      render: (totalStudents) => (
         <div className="flex items-center space-x-1">
           <UserOutlined style={{ color: "#9ca3af" }} />
-          <span>{students.toLocaleString()}</span>
+          <span>{totalStudents?.toLocaleString() || 0}</span>
         </div>
       ),
-      sorter: (a, b) => a.students - b.students,
+      sorter: (a, b) => a.totalStudents - b.totalStudents,
     },
-    {
-      title: "Rating",
-      dataIndex: "rating",
-      key: "rating",
-      render: (rating) =>
-        rating > 0 ? (
-          <div className="flex items-center">
-            {rating.toFixed(1)}
-            <span className="ml-1">⭐</span>
-          </div>
-        ) : (
-          <span className="text-gray-400">No ratings</span>
-        ),
-      sorter: (a, b) => a.rating - b.rating,
-    },
+    // {
+    //   title: "Rating",
+    //   dataIndex: "rating",
+    //   key: "rating",
+    //   render: (rating) =>
+    //     rating > 0 ? (
+    //       <div className="flex items-center">
+    //         {rating.toFixed(1)}
+    //         <span className="ml-1">⭐</span>
+    //       </div>
+    //     ) : (
+    //       <span className="text-gray-400">No ratings</span>
+    //     ),
+    //   sorter: (a, b) => a.rating - b.rating,
+    // },
     {
       title: "Price",
       dataIndex: "price",
       key: "price",
       render: (price) => (
-        <span className="font-semibold text-green-600">${price}</span>
+        <span className="font-semibold text-green-600">
+          {new Intl.NumberFormat("vi-VN").format(price || 0)} VNĐ
+        </span>
       ),
       sorter: (a, b) => a.price - b.price,
     },
@@ -310,19 +186,18 @@ const CourseManagement = () => {
         <div className="text-sm">
           <div className="flex items-center space-x-1">
             <PlayCircleOutlined style={{ color: "#9ca3af" }} />
-            <span>{record.duration}</span>
+            <span>{record.durationHours} hours</span>
           </div>
-          <div className="text-gray-500">{record.lessons} lessons</div>
+          <div className="text-gray-500">{record.totalLessons} lessons</div>
         </div>
       ),
     },
     {
       title: "Created",
-      dataIndex: "createdDate",
-      key: "createdDate",
-      render: (date) => new Date(date).toLocaleDateString(),
-      sorter: (a, b) =>
-        new Date(a.createdDate).getTime() - new Date(b.createdDate).getTime(),
+      dataIndex: "createdAt",
+      key: "createdAt",
+      render: (createdAt) => formatDate(createdAt),
+      sorter: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
     },
     {
       title: "Actions",
@@ -332,10 +207,13 @@ const CourseManagement = () => {
         <div className="flex flex-col gap-2">
           <Button
             className="!bg-blue-500 !text-white w-full"
-            onClick={() => showUpdateModal(record)}
+            onClick={() => {
+              e.stopPropagation(); // ngăn click lan ra hàng
+              handleActiveCourse(record.id);
+            }}
             style={{ marginRight: "10px" }}
           >
-            Update
+            Active
           </Button>
           <Button
             className="!bg-red-500 !text-white !w-full"
@@ -348,12 +226,15 @@ const CourseManagement = () => {
     },
   ];
 
-  const filteredData = courseData.filter((course) => {
+  const filteredData = allCourses.filter((course) => {
     const matchesSearch =
       course.title.toLowerCase().includes(searchText.toLowerCase()) ||
-      course.instructor.toLowerCase().includes(searchText.toLowerCase()) ||
-      course.id.toLowerCase().includes(searchText.toLowerCase()) ||
-      course.category.toLowerCase().includes(searchText.toLowerCase());
+      (course.mentor?.user?.fullName || "")
+        .toLowerCase()
+        .includes(searchText.toLowerCase()) ||
+      String(course.id).toLowerCase().includes(searchText.toLowerCase()) ||
+      (course.category || "").toLowerCase().includes(searchText.toLowerCase());
+
     const matchesStatus =
       filterStatus === "all" || course.status === filterStatus;
     const matchesCategory =
@@ -362,7 +243,7 @@ const CourseManagement = () => {
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
-  const categories = [...new Set(courseData.map((course) => course.category))];
+  const categories = [...new Set(allCourses.map((course) => course.category))];
 
   return (
     <div className="w-full h-full bg-gray-100">
@@ -381,7 +262,7 @@ const CourseManagement = () => {
                 filterStatus === "all" ? "bg-blue-600" : "hover:bg-blue-50"
               }`}
             >
-              All ({courseData.length})
+              All ({allCourses.length})
             </Button>
             <Button
               type={filterStatus === "approved" ? "primary" : "default"}
@@ -396,8 +277,7 @@ const CourseManagement = () => {
                   : "hover:bg-green-50"
               }`}
             >
-              Approved (
-              {courseData.filter((c) => c.status === "approved").length})
+              Active ({allCourses.filter((c) => c.status === "active").length})
             </Button>
             <Button
               type={filterStatus === "pending" ? "primary" : "default"}
@@ -410,7 +290,7 @@ const CourseManagement = () => {
                   : "hover:bg-orange-50"
               }`}
             >
-              Pending ({courseData.filter((c) => c.status === "pending").length}
+              Pending ({allCourses.filter((c) => c.status === "pending").length}
               )
             </Button>
             <Button
@@ -425,14 +305,14 @@ const CourseManagement = () => {
               }`}
             >
               Rejected (
-              {courseData.filter((c) => c.status === "rejected").length})
+              {allCourses.filter((c) => c.status === "rejected").length})
             </Button>
           </div>
 
           {/* Search and Filters */}
           <div className="flex flex-col sm:flex-row gap-4 items-center w-full lg:w-auto">
             <Search
-              placeholder="Search courses by title, instructor, or ID"
+              placeholder="Search courses by title, mentor, or ID"
               allowClear
               enterButton={<SearchOutlined />}
               size="large"
@@ -449,8 +329,8 @@ const CourseManagement = () => {
                 suffixIcon={<FilterOutlined />}
               >
                 <Option value="all">All Categories</Option>
-                {categories.map((category) => (
-                  <Option key={category} value={category}>
+                {categories.map((category, index) => (
+                  <Option key={category + index} value={category}>
                     {category}
                   </Option>
                 ))}
@@ -467,12 +347,26 @@ const CourseManagement = () => {
         bordered
         dataSource={filteredData}
         rowKey="id"
+        onRow={(record) => ({
+          onClick: () =>
+            navigate(`/admin/course-management/course-detail/${record.id}`),
+        })}
         pagination={{
-          pageSize: 10,
-          showSizeChanger: true,
+          current: currentPage,
+          pageSize: pageSize,
+          total: totalItems,
           showQuickJumper: true,
+          showSizeChanger: false,
+          pageSizeOptions: ["10", "20", "50", "100"],
           showTotal: (total, range) =>
             `${range[0]}-${range[1]} of ${total} courses`,
+          onChange: (page, size) => {
+            setCurrentPage(page);
+            if (size !== pageSize) {
+              setPageSize(size);
+              setCurrentPage(1); // Reset về trang 1 khi đổi page size
+            }
+          },
         }}
         scroll={{ x: "1600px", y: 400 }}
         loading={loading}

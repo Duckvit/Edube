@@ -132,6 +132,10 @@ function App() {
             element={<CourseManagement />}
           />
           <Route
+            path={`${path.ADMIN_COURSE_MANAGEMENT}/${path.USER_COURSE_DETAIL}`}
+            element={<CourseDetail />}
+          />
+          <Route
             path={path.ADMIN_LEARNER_MANAGEMENT}
             element={<LearnerManagement />}
           />
@@ -152,13 +156,16 @@ function App() {
         >
           <Route index element={<LearnerDashboard />} />
           <Route path={path.USER_PROFILE} element={<UserProfile />} />
-          <Route path={path.LEARNER_COURSE_DETAIL} element={<CourseDetail />} />
+          <Route path={path.USER_COURSE_DETAIL} element={<CourseDetail />} />
           <Route path={path.USER_CHAT} element={<Chat />} />
           <Route
             path={path.LEARNER_COURSE_PREVIEW}
             element={<CoursePreview />}
           />
-          <Route path={path.LEARNER_PAYMENT_SUCCESS} element={<PaymentSuccess />} />
+          <Route
+            path={path.LEARNER_PAYMENT_SUCCESS}
+            element={<PaymentSuccess />}
+          />
           <Route path={path.LEARNER_PAYMENT_FAIL} element={<PaymentFail />} />
         </Route>
       </Routes>

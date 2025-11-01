@@ -20,13 +20,13 @@ export const HomePage = () => {
       number: "01",
       title: "Sign Up & Choose Your Path",
       description:
-        "Create your account and select whether you're a student looking to learn or an instructor ready to teach.",
+        "Create your account and select whether you're a student looking to learn or an mentor ready to teach.",
     },
     {
       number: "02",
       title: "Access Learning Materials",
       description:
-        "Instructors upload courses and materials. Students browse our extensive library of AI-powered courses.",
+        "mentors upload courses and materials. Students browse our extensive library of AI-powered courses.",
     },
     {
       number: "03",
@@ -78,7 +78,7 @@ export const HomePage = () => {
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
                 <h3 className="text-lg font-semibold text-white mb-2">
-                  For Instructors
+                  For mentors
                 </h3>
                 <p className="text-purple-100 text-sm">
                   Advanced content creation tools
@@ -243,7 +243,7 @@ export const HomePage = () => {
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
                 <GraduationCap className="w-12 h-12 text-blue-300 mx-auto mb-4" />
                 <h3 className="text-2xl font-bold text-white mb-4">
-                  For Instructors
+                  For mentors
                 </h3>
                 <ul className="text-blue-100 space-y-2 mb-6">
                   <li>• AI-powered course creation</li>

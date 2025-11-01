@@ -7,7 +7,7 @@ export const PublicFooter = () => {
         <div className="text-center">
           <h3 className="text-xl font-bold mb-2">Edube</h3>
           <p className="text-purple-200 mb-4">
-            AI-powered learning platform for students and instructors
+            AI-powered learning platform for students and mentors
           </p>
           <div className="border-t border-purple-800 pt-4">
             <p className="text-purple-200">&copy; 2025 Edube. All rights reserved.</p>

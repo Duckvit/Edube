@@ -273,7 +273,7 @@ export const LearnerDashboard = () => {
             sm={12}
             lg={8}
             xl={6}
-            key={enroll.id || enroll.course?.id}
+            key={enroll.enrollmentId || enroll.id}
           >
             <Card
               hoverable
@@ -398,7 +398,7 @@ export const LearnerDashboard = () => {
               suffixIcon={<FilterOutlined />}
             >
               <Option value="all">All Categories</Option>
-              {categories.map((category) => (
+              {categories.filter(Boolean).map((category) => (
                 <Option key={category} value={category}>
                   {category}
                 </Option>
@@ -412,7 +412,7 @@ export const LearnerDashboard = () => {
               suffixIcon={<FilterOutlined />}
             >
               <Option value="all">All Levels</Option>
-              {levels.map((level) => (
+              {levels.filter(Boolean).map((level) => (
                 <Option key={level} value={level}>
                   {level}
                 </Option>
@@ -425,7 +425,7 @@ export const LearnerDashboard = () => {
       {/* Course Grid */}
       <Row gutter={[16, 16]}>
         {filteredAllCourses.map((course) => (
-          <Col xs={24} sm={12} lg={8} xl={6} key={course.key}>
+          <Col xs={24} sm={12} lg={8} xl={6} key={course.id}>
             <Card
               hoverable
               className="h-full flex flex-col"

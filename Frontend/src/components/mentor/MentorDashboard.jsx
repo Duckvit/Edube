@@ -2,33 +2,73 @@ import React, { useState, useEffect } from "react";
 import Loading from "../common/Loading";
 import { statsData, activitiesData, conversations } from "../../utils/mockData";
 import { BookOpen, Users, TrendingUp, Star } from "lucide-react";
+import { getAllActiveCoursesByMentorId } from "../../apis/CourseServices";
+import { useUserStore } from "../../store/useUserStore";
+import { toast } from "react-toastify";
 
 export const Dashboard = () => {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
-  const [activities, setActivities] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [totalActiveCourses, setTotalActiveCourses] = useState(0);
+  const [totalLearners, setTotalLearners] = useState(0);
+  const [error, setError] = useState(null);
+  const { userData, token } = useUserStore();
+
+  // useEffect(() => {
+  //   // giả lập fetch API
+  //   setTimeout(() => {
+  //     setStats(statsData);
+  //     setActivities(activitiesData);
+
+  //     // Lấy tin nhắn mới nhất từ mỗi conversation
+  //     const latestMessages = conversations.map((c) => {
+  //       const lastMessage = c.messages[c.messages.length - 1];
+  //       return {
+  //         name: c.name,
+  //         text: lastMessage.text,
+  //         time: lastMessage.time,
+  //         isRead: lastMessage.isRead,
+  //       };
+  //     });
+
+  //     setMessages(latestMessages);
+  //   }, 500);
+  // }, []);
 
   useEffect(() => {
-    // giả lập fetch API
-    setTimeout(() => {
-      setStats(statsData);
-      setActivities(activitiesData);
+    const fetchAllActiveCourse = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setError("Token không tồn tại");
+        return;
+      }
+      if (!userData?.mentor?.id) {
+        setError("Không tìm thấy thông tin mentor");
+        return;
+      }
 
-      // Lấy tin nhắn mới nhất từ mỗi conversation
-      const latestMessages = conversations.map((c) => {
-        const lastMessage = c.messages[c.messages.length - 1];
-        return {
-          name: c.name,
-          text: lastMessage.text,
-          time: lastMessage.time,
-          isRead: lastMessage.isRead,
-        };
-      });
+      try {
+        setLoading(true);
+        const data = await getAllActiveCoursesByMentorId(
+          userData.mentor.id,
+          token
+        );
+        setCourses(data);
+        console.log("API response allActiveCourses: ", data);
+        setTotalActiveCourses(data.totalActiveCourses || 0);
+        setTotalLearners(data.totalLearners || 0);
+      } catch (err) {
+        console.error("Lỗi khi gọi API All Courses:", err);
+        setError(err.message || "Đã xảy ra lỗi");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      setMessages(latestMessages);
-    }, 500);
-  }, []);
+    fetchAllActiveCourse();
+  }, [userData]);
 
   return (
     <div className="bg-gray-100 rounded-lg shadow-lg m-2">
@@ -46,12 +86,12 @@ export const Dashboard = () => {
                 Active Courses
               </p>
               <p className="text-3xl font-bold text-gray-900">
-                {stats?.courses}
+                {totalActiveCourses}
               </p>
-              <p className="text-sm text-green-600 flex items-center mt-1">
+              {/* <p className="text-sm text-green-600 flex items-center mt-1">
                 <TrendingUp className="w-4 h-4 mr-1" />
                 +3 new this month
-              </p>
+              </p> */}
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
               <BookOpen className="w-6 h-6 text-purple-600" />
@@ -66,12 +106,12 @@ export const Dashboard = () => {
                 Total Students
               </p>
               <p className="text-3xl font-bold text-gray-900">
-                {stats?.students}
+                {totalLearners}
               </p>
-              <p className="text-sm text-green-600 flex items-center mt-1">
+              {/* <p className="text-sm text-green-600 flex items-center mt-1">
                 <TrendingUp className="w-4 h-4 mr-1" />
                 +12% from last month
-              </p>
+              </p> */}
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <Users className="w-6 h-6 text-blue-600" />
@@ -86,10 +126,10 @@ export const Dashboard = () => {
               <p className="text-3xl font-bold text-gray-900">
                 {stats?.rating}
               </p>
-              <p className="text-sm text-yellow-600 flex items-center mt-1">
+              {/* <p className="text-sm text-yellow-600 flex items-center mt-1">
                 <Star className="w-4 h-4 mr-1 fill-current" />
                 Based on 892 reviews
-              </p>
+              </p> */}
             </div>
             <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
               <Star className="w-6 h-6 text-yellow-600" />
@@ -106,10 +146,10 @@ export const Dashboard = () => {
               <p className="text-3xl font-bold text-gray-900">
                 {stats?.revenue}
               </p>
-              <p className="text-sm text-green-600 flex items-center mt-1">
+              {/* <p className="text-sm text-green-600 flex items-center mt-1">
                 <TrendingUp className="w-4 h-4 mr-1" />
                 +8% from last month
-              </p>
+              </p> */}
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-green-600" />
@@ -125,28 +165,32 @@ export const Dashboard = () => {
             Recent Course Activity
           </h3>
           <div className="space-y-4 max-h-100 overflow-y-auto">
-            {activities.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-              >
-                <div>
-                  <p className="font-medium text-gray-900">{item.course}</p>
-                  <p className="text-sm text-gray-600">
-                    {item.students} students enrolled
-                  </p>
-                </div>
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    item.status === "active"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-yellow-100 text-yellow-800"
-                  }`}
+            {courses?.courses?.length > 0 ? (
+              courses.courses.map((item, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
-                  {item.status}
-                </span>
-              </div>
-            ))}
+                  <div>
+                    <p className="font-medium text-gray-900">{item.title}</p>
+                    <p className="text-sm text-gray-600">
+                      {item.students ?? 0} students enrolled
+                    </p>
+                  </div>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      item.status === "active"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {item.status ?? "inactive"}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p>No active courses found</p>
+            )}
           </div>
         </div>
 

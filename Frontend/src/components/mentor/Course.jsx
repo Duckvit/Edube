@@ -35,6 +35,7 @@ export const Course = () => {
   const [courses, setCourses] = useState([]);
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(10);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { token, userData, fullData } = useUserStore();
   const [formData, setFormData] = useState({
@@ -45,18 +46,18 @@ export const Course = () => {
   });
 
   const fetchCourses = async () => {
-  const token = localStorage.getItem("token");
-  try {
-    const data = await getAllCourses(page, size, token);
-    setCourses(data.content || []);
-  } catch (err) {
-    console.error("Error fetching courses:", err);
-  }
-};
+    const token = localStorage.getItem("token");
+    try {
+      const data = await getAllCourses(page, size, token);
+      setCourses(data.content || []);
+    } catch (err) {
+      console.error("Error fetching courses:", err);
+    }
+  };
 
-useEffect(() => {
-  fetchCourses(); // gọi khi trang load hoặc đổi page/size
-}, [page, size]);
+  useEffect(() => {
+    fetchCourses(); // gọi khi trang load hoặc đổi page/size
+  }, [page, size]);
 
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -87,10 +88,9 @@ useEffect(() => {
 
     try {
       const res = await createCourse(token, data);
-      toast.success("✅ Course created successfully!");
-
-      // 👇 gọi lại danh sách
-      await fetchCourses(); // <-- hàm load lại course list của bạn
+      toast.success("Course created successfully!");
+      setIsCreateModalVisible(false);
+      await fetchCourses();
     } catch (err) {
       console.error("❌ Error creating course:", err);
       toast.error("Failed to create course. Please try again.");
@@ -124,6 +124,7 @@ useEffect(() => {
       title: "Course Title",
       dataIndex: "title",
       key: "title",
+      fixed: "left",
       render: (text, content) => (
         <div>
           <div className="font-semibold text-gray-900">{text}</div>
@@ -203,28 +204,25 @@ useEffect(() => {
     {
       title: "Actions",
       key: "actions",
+      fixed: "right",
       render: (_, record) => (
-        <Space wrap>
+        <div className="flex flex-col gap-2">
           <Button
-            type="primary"
-            size="small"
             icon={<EditOutlined />}
+            className="!bg-blue-500 !text-white w-full"
             onClick={() => navigate(`/mentor/course/${record.id}/builder`)}
+            style={{ marginRight: "10px" }}
           >
             Edit
           </Button>
           <Button
-            danger // màu đỏ
-            size="small"
             icon={<DeleteOutlined />}
-            onClick={() => console.log("Delete course", record.id)} // ví dụ
+            className="!bg-red-500 !text-white !w-full"
+            onClick={() => console.log("Delete course", record.id)}
           >
             Delete
           </Button>
-          {/* <Dropdown menu={getActionMenu(record)} trigger={["click"]}>
-            <Button size="small" icon={<MoreOutlined />} />
-          </Dropdown> */}
-        </Space>
+        </div>
       ),
     },
   ];
@@ -263,7 +261,7 @@ useEffect(() => {
   };
 
   return (
-    <div className="space-y-6 m-2">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">My Courses</h2>
         <button
@@ -275,30 +273,37 @@ useEffect(() => {
           <span>Create Course</span>
         </button>
       </div>
-
-      <div className="flex items-center space-x-4 mb-6">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <input
-            type="text"
-            placeholder="Search courses..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-        </div>
-        <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-          <Filter className="w-4 h-4" />
-          <span>Filter</span>
-        </button>
-      </div>
-
       <Card>
-        <Table
-          columns={columns}
-          dataSource={courses}
-          rowKey="id"
-          pagination={{ pageSize: 10 }}
-        />
+        <div className="flex items-center space-x-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 " />
+            <input
+              type="text"
+              placeholder="Search courses..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+          </div>
+          <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+            <Filter className="w-4 h-4" />
+            <span>Filter</span>
+          </button>
+        </div>
       </Card>
+
+      <Table
+        columns={columns}
+        dataSource={courses}
+        rowKey="id"
+        pagination={{
+          pageSize: 10,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total, range) =>
+            `${range[0]}-${range[1]} of ${total} courses`,
+        }}
+        scroll={{ x: "1600px", y: 400 }}
+        loading={loading}
+      />
 
       <Modal
         title={

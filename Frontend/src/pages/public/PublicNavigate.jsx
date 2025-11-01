@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { useLocation, useNavigate } from "react-router-dom";
 import { UserRegister, UserLogin, getProfile } from "../../apis/UserServices";
-import { Modal, Form, Input, Button, Divider, Checkbox, Radio } from "antd";
+import { createMentor } from "../../apis/MentorServices";
+import { createLearner } from "../../apis/LearnerServices";
+import { Modal, Form, Input, Button, Divider } from "antd";
 import { MailOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
 import { roleForComponent } from "../../utils/constant";
 import { useUserStore } from "../../store/useUserStore";
@@ -16,10 +18,12 @@ export const PublicNavigate = ({
   const [form] = Form.useForm();
   const [showSignIn, setShowSignIn] = useState(false);
   const [showSignUp, setShowSignUp] = useState(false);
+  const [showMentorSignUp, setShowMentorSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [payload, setPayload] = useState({ username: "", password: "" });
   const [loginForm] = Form.useForm();
   const [registerForm] = Form.useForm();
+  const [mentorRegisterForm] = Form.useForm();
   const [scrollY, setScrollY] = useState(0);
   const { setModal, role, resetUserStore } = useUserStore();
   const { FcGoogle } = icons;
@@ -34,6 +38,7 @@ export const PublicNavigate = ({
   const handleCancel = () => {
     setShowSignIn(false);
     setShowSignUp(false);
+    setShowMentorSignUp(false);
     if (onCloseSignInSignUp) onCloseSignInSignUp();
   };
 
@@ -41,74 +46,6 @@ export const PublicNavigate = ({
     if (openSignIn) setShowSignIn(true);
     if (openSignUp) setShowSignUp(true);
   }, [openSignIn, openSignUp]);
-
-  // const onFinish = (values) => {
-  //   const { email, password } = values;
-  //   if (email && password) {
-  //     setLoading(true);
-  //     console.log("Form values:", values);
-
-  //     setTimeout(() => {
-  //       setLoading(false);
-  //       setShowSignIn(false);
-
-  //       if (email === "i@gmail.com" && password === "123") {
-  //         toast.success("Login successfully!");
-  //         navigate(path.PUBLIC_INSTRUCTOR);
-  //       } else if (email === "a@gmail.com" && password === "123") {
-  //         toast.success("Login successfully!");
-  //         navigate(path.PUBLIC_ADMIN);
-  //       }else if (email === "learn@gmail.com" && password === "123") {
-  //         toast.success("Login successfully!");
-  //         navigate(path.PUBLIC_LEARNER);
-  //       }
-  //       else {
-  //         toast.error("Login failed!");
-  //         console.log("Email or password incorrect!");
-  //       }
-  //     }, 1500);
-  //   }
-  // };
-
-  const onFinish = (values) => {
-    setPayload(values);
-  };
-
-  useEffect(() => {
-    const queryParams = new URLSearchParams(location.search);
-    const token = queryParams.get("token");
-    const role = queryParams.get("role");
-
-    if (token && token !== "null") {
-      // Save token first - use "USER" as default if role is empty
-      const defaultRole = role || "USER";
-      setModal(token, defaultRole, true);
-      
-      // Normalize role to uppercase for comparison
-      const normalizedRole = defaultRole?.toUpperCase();
-      
-      // Small delay to ensure token is saved to localStorage
-      setTimeout(() => {
-        if (normalizedRole === "USER" || !normalizedRole || normalizedRole === "") {
-          // 🧩 Nếu là user mặc định → bắt qua trang chọn role
-          toast.info("Please select your role to continue");
-          navigate("/choose-role");
-        } else if (normalizedRole && roleForComponent[normalizedRole]) {
-          // ✅ Nếu có role hợp lệ → điều hướng như bình thường
-          toast.success("Login Successful");
-          navigate("/" + roleForComponent[normalizedRole]);
-        } else {
-          console.log("Invalid role detected:", role, "Normalized:", normalizedRole);
-          toast.error("Invalid role detected");
-        }
-      }, 100);
-    } else if (token === "null") {
-      // ❌ Login thất bại
-      resetUserStore();
-      toast.error("Login Failed: Your email was not found");
-      window.history.replaceState({}, document.title, location.pathname);
-    }
-  }, [location.search, navigate, setModal, resetUserStore]);
 
   const handleLogin = async () => {
     const { setModal, setUserData } = useUserStore.getState();
@@ -127,16 +64,13 @@ export const PublicNavigate = ({
         const token = response.data.token;
         const userRole = response.data.role;
 
-        // ✅ Lưu token + role vào localStorage & store
         setModal(token, userRole, true);
 
-        // ✅ Gọi API lấy thông tin user
         const profileRes = await getProfile(payload.username, token);
         if (profileRes?.user) {
           setUserData(profileRes.user); // Lưu vào Zustand
         }
 
-        // ✅ Điều hướng theo role
         const dashboardPath = roleForComponent[userRole];
         if (userRole && dashboardPath) {
           toast.success("Login successful!");
@@ -178,10 +112,39 @@ export const PublicNavigate = ({
     }
   };
 
+  const handleMentorRegister = async (values) => {
+    setLoading(true);
+    try {
+      const mentorValues = { ...values, role: "mentor" };
+      const response = await UserRegister(mentorValues);
+      setLoading(false);
+
+      if (response && response.status === 200) {
+        toast.success("Mentor Registration Successful");
+        setShowMentorSignUp(false);
+        switchToSignIn();
+      } else if (response?.status === 400) {
+        toast.error(
+          response.data.message || "Registration failed, please try again."
+        );
+      } else {
+        toast.error("Unexpected error occurred, please try again.");
+      }
+    } catch (error) {
+      setLoading(false);
+      console.log("Error mentor register: ", error);
+      toast.error(
+        "An error occurred during registration. Please check your network."
+      );
+    }
+  };
+
   const switchToSignIn = () => {
     registerForm.resetFields();
+    mentorRegisterForm.resetFields();
     loginForm.resetFields();
     setShowSignUp(false);
+    setShowMentorSignUp(false);
     setShowSignIn(true);
   };
 
@@ -245,7 +208,7 @@ export const PublicNavigate = ({
           </nav>
 
           {/* CTA */}
-          <div className="hidden lg:flex items-center space-x-4">
+          <div className="hidden lg:flex items-center space-x-3">
             <button
               className="text-gray-700 hover:text-cyan-600 transition-colors font-medium px-4 py-2"
               onClick={() => setShowSignIn(true)}
@@ -257,6 +220,12 @@ export const PublicNavigate = ({
               onClick={() => setShowSignUp(true)}
             >
               Get Started
+            </button>
+            <button
+              className="border-2 border-sky-600 text-blue-600 px-6 py-2 rounded-2xl hover:bg-sky-50 transition-all font-semibold"
+              onClick={() => setShowMentorSignUp(true)}
+            >
+              Be a Mentor now
             </button>
           </div>
 
@@ -385,7 +354,7 @@ export const PublicNavigate = ({
             </div>
           </Modal>
 
-          {/* Register Modal */}
+          {/* Register Modal - Learner */}
           <Modal
             open={showSignUp}
             onCancel={handleCancel}
@@ -458,17 +427,6 @@ export const PublicNavigate = ({
                 </Form.Item>
 
                 <Form.Item
-                  label="Role"
-                  name="role"
-                  rules={[{ required: true }]}
-                >
-                  <Radio.Group className="w-full flex justify-between">
-                    <Radio value="learner">Learner</Radio>
-                    <Radio value="mentor">Mentor</Radio>
-                  </Radio.Group>
-                </Form.Item>
-
-                <Form.Item
                   label="Password"
                   name="password"
                   rules={[
@@ -518,6 +476,143 @@ export const PublicNavigate = ({
                     className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-yellow-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-yellow-700 !text-white"
                   >
                     Create Account
+                  </Button>
+                </Form.Item>
+              </Form>
+            </div>
+
+            <div className="text-center mt-2">
+              Already have an account?{" "}
+              <button
+                onClick={switchToSignIn}
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Sign in here
+              </button>
+            </div>
+          </Modal>
+
+          <Modal
+            open={showMentorSignUp}
+            onCancel={handleCancel}
+            footer={null}
+            centered
+            width={450}
+            styles={{
+              body: { padding: "2rem" },
+            }}
+          >
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <img src="FIB_logo.png" className="object-cover h-[5vh]" />
+              </div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent mb-2">
+                Become a Mentor
+              </h2>
+              <p className="text-gray-600">
+                Share your knowledge and inspire learners worldwide
+              </p>
+            </div>
+
+            <div className="max-h-70 overflow-y-auto p-5">
+              <Form
+                form={mentorRegisterForm}
+                layout="vertical"
+                onFinish={handleMentorRegister}
+              >
+                <Form.Item
+                  label="FullName"
+                  name="fullName"
+                  rules={[
+                    { required: true, message: "Please enter your full name" },
+                  ]}
+                >
+                  <Input
+                    prefix={<UserOutlined className="text-gray-400" />}
+                    placeholder="Enter your full name"
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+                <Form.Item
+                  label="Username"
+                  name="username"
+                  rules={[
+                    { required: true, message: "Please enter your username" },
+                  ]}
+                >
+                  <Input
+                    id="mentorUsername"
+                    prefix={<UserOutlined className="text-gray-400" />}
+                    placeholder="Enter your username"
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Email Address"
+                  name="email"
+                  rules={[
+                    { required: true, message: "Please enter your email" },
+                    { type: "email", message: "Invalid email format" },
+                  ]}
+                >
+                  <Input
+                    prefix={<MailOutlined className="text-gray-400" />}
+                    placeholder="Enter your email"
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Password"
+                  name="password"
+                  rules={[
+                    { required: true, message: "Please create a password" },
+                  ]}
+                >
+                  <Input.Password
+                    id="mentorPassword"
+                    prefix={<LockOutlined className="text-gray-400" />}
+                    placeholder="Create a password"
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Confirm Password"
+                  name="confirmPassword"
+                  dependencies={["password"]}
+                  rules={[
+                    { required: true, message: "Please confirm your password" },
+                    ({ getFieldValue }) => ({
+                      validator(_, value) {
+                        if (!value || getFieldValue("password") === value) {
+                          return Promise.resolve();
+                        }
+                        return Promise.reject(
+                          new Error("Passwords do not match")
+                        );
+                      },
+                    }),
+                  ]}
+                >
+                  <Input.Password
+                    id="mentor-confirm-password"
+                    prefix={<LockOutlined className="text-gray-400" />}
+                    placeholder="Confirm your password"
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+
+                <Form.Item>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={loading}
+                    size="large"
+                    className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-blue-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-blue-700 !text-white"
+                  >
+                    Become a Mentor
                   </Button>
                 </Form.Item>
               </Form>

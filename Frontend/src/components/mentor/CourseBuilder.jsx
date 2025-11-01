@@ -3,7 +3,9 @@ import {
   getSectionByCourseId,
   createSection,
 } from "../../apis/SectionServices";
-import { getCourseById as fetchCourseById } from "../../apis/CourseServices";
+import { getCourseById, deleteCourse } from "../../apis/CourseServices";
+import { uploadLesson } from "../../apis/LessonServices";
+import { useUserStore } from "../../store/useUserStore";
 import { toast } from "react-toastify";
 import {
   Card,
@@ -42,24 +44,22 @@ const CourseBuilder = () => {
   const { courseId } = useParams();
   const [sectionForm] = Form.useForm();
   const [videoForm] = Form.useForm();
-
   const [course, setCourse] = useState({});
-
   const [sections, setSections] = useState([]);
-
   const [isSectionModalVisible, setIsSectionModalVisible] = useState(false);
   const [isVideoModalVisible, setIsVideoModalVisible] = useState(false);
   const [editingSection, setEditingSection] = useState(null);
   const [editingVideo, setEditingVideo] = useState(null);
   const [currentSectionId, setCurrentSectionId] = useState(null);
+  const userData = useUserStore((s) => s.userData);
+  const firstSection = course.curriculum?.[0];
 
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem("token");
       try {
         const data = await getSectionByCourseId(courseId, token);
-        console.log("📦 API response:", data);
-        setSections(data?.sections || []);
+        setSections(data?.sections || data || []);
       } catch (err) {
         console.error("❌ Error fetching sections:", err);
         toast.error("Failed to load sections");
@@ -68,6 +68,73 @@ const CourseBuilder = () => {
 
     fetchData();
   }, [courseId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const res = await getCourseById(courseId);
+        const c = res?.data || res || {};
+
+        const mapped = {
+          id: c.id || c.courseId || c._id || courseId,
+          title: c.title || c.name || "Untitled Course",
+          instructor:
+            c.instructor || c.author || c.mentor?.user?.fullName || "Unknown",
+          description: c.description || c.summary || c.overview || "",
+          rating: c.rating || 5,
+          students: c.totalStudents ?? c.students ?? c.enrolledCount ?? 0,
+          duration:
+            c.duration ||
+            (c.durationHours
+              ? `${c.durationHours} hours`
+              : c.hours
+              ? `${c.hours} hours`
+              : "") ||
+            0,
+          totalLessons:
+            c.totalLessons ||
+            c.lessons ||
+            (c.sections
+              ? c.sections.reduce((acc, s) => acc + (s.lessons?.length || 0), 0)
+              : 0),
+          // curriculum: c.sections || c.curriculum || [],
+        };
+
+        // mapped.curriculum = curriculum;
+
+        if (mounted) setCourse(mapped);
+      } catch (err) {
+        console.error("Failed to load course detail", err);
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [courseId, userData]);
+
+  const handleUpload = async () => {
+    const token = localStorage.getItem("token");
+
+    // Tạo FormData
+    const formData = new FormData();
+    formData.append("section.id", sectionId);
+    formData.append("title", title);
+    formData.append("description", description);
+    formData.append("file", file); // file là object từ input
+
+    try {
+      const res = await uploadLesson(formData, token, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success("Lesson uploaded successfully!");
+      console.log("✅ Response:", res.data);
+    } catch (err) {
+      console.error("❌ Upload failed:", err);
+      toast.error("Failed to upload lesson!");
+    }
+  };
 
   const handleCreateSection = async () => {
     try {
@@ -159,7 +226,7 @@ const CourseBuilder = () => {
     setEditingVideo(null);
     // videoForm.resetFields();
     // setIsVideoModalVisible(true);
-    navigate(path.MENTOR_UPLOAD_LESSON)
+    navigate(`${path.MENTOR_UPLOAD_LESSON}/${sectionId}`);
   };
 
   const handleEditVideo = (sectionId, video) => {
@@ -273,7 +340,7 @@ const CourseBuilder = () => {
                 </div>
               </div>
             </div>
-            <Space>
+            {/* <Space>
               <Button icon={<EyeOutlined />}>Preview</Button>
               <Button
                 type="primary"
@@ -284,7 +351,7 @@ const CourseBuilder = () => {
               >
                 Publish Course
               </Button>
-            </Space>
+            </Space> */}
           </div>
         </div>
       </div>
@@ -328,97 +395,107 @@ const CourseBuilder = () => {
             />
           </Card>
         ) : (
-          <Collapse accordion className="bg-white" expandIconPosition="end">
-            {sections.map((section, index) => (
-              <Panel
-                key={section.id}
-                header={
-                  <div className="flex items-center justify-between w-full pr-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded font-semibold">
-                        {index + 1}
+          <Collapse
+            accordion
+            className="bg-white"
+            expandIconPosition="end"
+            items={sections.map((section, index) => ({
+              key: section.id,
+              label: (
+                <div className="flex items-center justify-between w-full pr-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded font-semibold">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900">
+                        {section.title}
                       </div>
-                      <div>
-                        <div className="font-semibold text-gray-900">
-                          {section.title}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {section.videos?.length || 0} videos •{" "}
-                          {/* {getTotalDuration(section.videos)} */}
-                        </div>
+                      <div className="text-sm text-gray-500">
+                        {section.lessons?.length ?? section.videos?.length ?? 0}{" "}
+                        lessons
                       </div>
                     </div>
-                    <Space onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="small"
-                        icon={<EditOutlined />}
-                        onClick={() => handleEditSection(section)}
-                      />
-                      <Button
-                        size="small"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={() => handleDeleteSection(section.id)}
-                      />
-                    </Space>
                   </div>
-                }
-              >
+                  <Space onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={() => handleEditSection(section)}
+                    />
+                    <Button
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => handleDeleteSection(section.id)}
+                    />
+                  </Space>
+                </div>
+              ),
+              children: (
                 <div className="pl-11">
                   {section.description && (
                     <p className="text-gray-600 mb-4">{section.description}</p>
                   )}
 
-                  {section.videos?.length === 0 ? (
+                  {(section.lessons?.length ?? section.videos?.length ?? 0) ===
+                  0 ? (
                     <Empty
-                      description="No videos in this section"
+                      description="No lessons in this section"
                       image={Empty.PRESENTED_IMAGE_SIMPLE}
                     >
                       <Button
                         type="primary"
                         size="small"
                         icon={<PlusOutlined />}
-                        onClick={() => handleAddVideo(section.id)}
+                        onClick={() => handleAddLesson(section.id)}
                       >
                         Add Lesson
                       </Button>
                     </Empty>
                   ) : (
                     <div className="space-y-2">
-                      {section.videos?.map((video, vIndex) => (
-                        <div
-                          key={video.id}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <PlayCircleOutlined className="text-blue-600 text-lg" />
-                            <div>
-                              <div className="font-medium text-gray-900">
-                                {video.title}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {formatDuration(video.duration)}
-                                {video.description && ` • ${video.description}`}
+                      {(section.lessons || section.videos || []).map(
+                        (lesson) => (
+                          <div
+                            key={lesson.id}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <PlayCircleOutlined className="text-blue-600 text-lg" />
+                              <div>
+                                <div className="font-medium text-gray-900">
+                                  {lesson.title}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {lesson.duration
+                                    ? formatDuration(lesson.duration)
+                                    : null}
+                                  {lesson.description &&
+                                    ` • ${lesson.description}`}
+                                </div>
                               </div>
                             </div>
+                            <Space>
+                              <Button
+                                size="small"
+                                icon={<EditOutlined />}
+                                onClick={() =>
+                                  handleEditVideo(section.id, lesson)
+                                }
+                              />
+                              <Button
+                                size="small"
+                                danger
+                                icon={<DeleteOutlined />}
+                                onClick={() =>
+                                  handleDeleteVideo(section.id, lesson.id)
+                                }
+                              />
+                            </Space>
                           </div>
-                          <Space>
-                            <Button
-                              size="small"
-                              icon={<EditOutlined />}
-                              onClick={() => handleEditVideo(section.id, video)}
-                            />
-                            <Button
-                              size="small"
-                              danger
-                              icon={<DeleteOutlined />}
-                              onClick={() =>
-                                handleDeleteVideo(section.id, video.id)
-                              }
-                            />
-                          </Space>
-                        </div>
-                      ))}
+                        )
+                      )}
                       <Button
                         type="dashed"
                         icon={<PlusOutlined />}
@@ -430,9 +507,9 @@ const CourseBuilder = () => {
                     </div>
                   )}
                 </div>
-              </Panel>
-            ))}
-          </Collapse>
+              ),
+            }))}
+          />
         )}
       </div>
 

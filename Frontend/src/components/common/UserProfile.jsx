@@ -30,6 +30,7 @@ const { TextArea } = Input;
 
 export const UserProfile = () => {
   const { role, userData, setIsUpdate, isUpdate } = useUserStore();
+  const [displayRole, setDisplayRole] = useState(role || null);
   const navigate = useNavigate();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -37,27 +38,60 @@ export const UserProfile = () => {
 
   const [profile, setProfile] = useState(null);
 
-  const currentProfile = profile ? profile[role] : null;
+  // effectiveRole prefers backend-detected role (profile.learner/profile.mentor), then displayRole, then store role
+  const effectiveRole =
+    (profile &&
+      (profile.learner ? "learner" : profile.mentor ? "mentor" : null)) ||
+    displayRole ||
+    role;
+
+  // merge top-level user with nested learner/mentor object for easier access in UI
+  const currentProfile = profile
+    ? profile.learner
+      ? { ...profile, ...profile.learner }
+      : profile.mentor
+      ? { ...profile, ...profile.mentor }
+      : { ...profile }
+    : null;
 
   useEffect(() => {
     const fetchProfile = async () => {
       const roleProfile = name ? name.toUpperCase() : role;
-      const username = localStorage.getItem("username");
-      const token = localStorage.getItem("token");
+      // try multiple fallbacks for username/token
+      const username =
+        localStorage.getItem("username") ||
+        userData?.username ||
+        (useUserStore.getState && useUserStore.getState().username) ||
+        null;
+      const token =
+        localStorage.getItem("token") ||
+        userData?.token ||
+        (useUserStore.getState && useUserStore.getState().token) ||
+        null;
 
-      if (!username || !token) return;
+      if (!username || !token) {
+        // still attempt to fetch if we have at least username; otherwise skip
+        if (!username) return;
+      }
 
       try {
-        const response = await getProfile(username, token); 
-        const user = response?.user;
+        const response = await getProfile(username, token);
+        const user = response?.user || null;
 
-        const data = roleProfile === "MENTOR" ? user?.mentor : user?.learner;
+        // store the raw user object and derive currentProfile above
+        setProfile(user);
 
-        setProfile({ ...user, ...data }); // ✅ Gộp profile chung
+        // derive display role from returned user if not already set
+        if (user) {
+          const derived = user.learner
+            ? "learner"
+            : user.mentor
+            ? "mentor"
+            : role || "learner";
+          setDisplayRole(derived);
+        }
       } catch (err) {
         console.error("Error fetching profile:", err);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -65,26 +99,35 @@ export const UserProfile = () => {
   }, []);
 
   const showEditModal = () => {
-    if (role === "learner") {
+    // Prevent opening the edit modal before profile is loaded
+    if (!currentProfile) {
+      message.warning("Profile is still loading. Please wait a moment.");
+      return;
+    }
+
+    const activeRole = effectiveRole;
+
+    if (activeRole === "learner") {
       form.setFieldsValue({
-        username: currentProfile.username,
-        fullName: currentProfile.fullName,
-        email: currentProfile.email,
-        phone: currentProfile.phone,
-        educationLevel: currentProfile.educationLevel,
-        avatarUrl: currentProfile.avatarUrl,
+        username: currentProfile?.username,
+        fullName: currentProfile?.fullName,
+        email: currentProfile?.email,
+        phone: currentProfile?.phone,
+        educationLevel: currentProfile?.educationLevel,
+        avatarUrl: currentProfile?.avatarUrl,
       });
     } else {
       form.setFieldsValue({
-        username: currentProfile.username,
-        fullName: currentProfile.fullName,
-        email: currentProfile.email,
-        phone: currentProfile.phone,
-        expertiseArea: currentProfile.expertiseArea,
-        bio: currentProfile.bio,
-        avatarUrl: currentProfile.avatarUrl,
+        username: currentProfile?.username,
+        fullName: currentProfile?.fullName,
+        email: currentProfile?.email,
+        phone: currentProfile?.phone,
+        expertiseArea: currentProfile?.expertiseArea,
+        bio: currentProfile?.bio,
+        avatarUrl: currentProfile?.avatarUrl,
       });
     }
+
     setIsEditModalVisible(true);
   };
 
@@ -92,7 +135,7 @@ export const UserProfile = () => {
     try {
       setProfile({
         ...profile,
-        [role]: {
+        [effectiveRole]: {
           ...currentProfile,
           ...values,
         },
@@ -105,7 +148,7 @@ export const UserProfile = () => {
   };
 
   const expertiseAreas =
-    role === "mentor"
+    effectiveRole === "mentor" && currentProfile?.expertiseArea
       ? currentProfile.expertiseArea.split(",").map((area) => area.trim())
       : [];
 
@@ -123,7 +166,7 @@ export const UserProfile = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
             <p className="text-gray-600 mt-1">
-              {role === "learner"
+              {effectiveRole === "learner"
                 ? "Manage your personal information"
                 : "Manage your mentor information"}
             </p>
@@ -157,20 +200,20 @@ export const UserProfile = () => {
                 </p>
                 <div
                   className={`inline-flex items-center px-3 py-1 rounded-full font-medium text-sm mb-3 ${
-                    role === "learner"
+                    effectiveRole === "learner"
                       ? "bg-blue-100 text-blue-700"
                       : "bg-emerald-100 text-emerald-700"
                   }`}
                 >
-                  {role === "learner" ? (
+                  {effectiveRole === "learner" ? (
                     <UserOutlined className="mr-1" />
                   ) : (
                     <TrophyOutlined className="mr-1" />
                   )}
-                  {role === "learner" ? "Learner" : "Mentor"}
+                  {effectiveRole === "learner" ? "Learner" : "Mentor"}
                 </div>
 
-                {role === "mentor" && (
+                {effectiveRole === "mentor" && (
                   <div className="flex items-center justify-center bg-amber-50 px-4 py-2 rounded-lg">
                     <StarOutlined className="text-amber-500 text-lg mr-2" />
                     <span className="text-2xl font-bold text-gray-900">
@@ -195,7 +238,7 @@ export const UserProfile = () => {
                       {currentProfile?.phone || "Not provided"}
                     </span>
                   </div>
-                  {role === "learner" && (
+                  {effectiveRole === "learner" && (
                     <div className="flex items-center text-gray-700">
                       <BookOutlined className="text-lg mr-3 text-amber-600" />
                       <span className="text-sm">
@@ -232,7 +275,7 @@ export const UserProfile = () => {
                   </span>
                 </Descriptions.Item>
 
-                {role === "learner" && (
+                {effectiveRole === "learner" && (
                   <Descriptions.Item label="Education Level">
                     <span className="font-medium text-gray-900">
                       {currentProfile?.educationLevel || "Not provided"}
@@ -240,7 +283,7 @@ export const UserProfile = () => {
                   </Descriptions.Item>
                 )}
 
-                {role === "mentor" && (
+                {effectiveRole === "mentor" && (
                   <>
                     <Descriptions.Item label="Rating">
                       <div className="flex items-center">
@@ -276,13 +319,13 @@ export const UserProfile = () => {
 
             <Card
               title={
-                role === "learner"
+                effectiveRole === "learner"
                   ? "Learning Statistics"
                   : "Teaching Statistics"
               }
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {role === "learner" ? (
+                {effectiveRole === "learner" ? (
                   <>
                     <div className="text-center p-4 bg-blue-50 rounded-lg">
                       <div className="text-3xl font-bold text-blue-600 mb-1">
@@ -388,7 +431,7 @@ export const UserProfile = () => {
             />
           </Form.Item>
 
-          {role === "learner" && (
+          {effectiveRole === "learner" && (
             <Form.Item label="Education Level" name="educationLevel">
               <Select placeholder="Select education level">
                 <Option value="High School">High School</Option>
@@ -401,7 +444,7 @@ export const UserProfile = () => {
             </Form.Item>
           )}
 
-          {role === "mentor" && (
+          {effectiveRole === "mentor" && (
             <>
               <Form.Item
                 label="Expertise Area"

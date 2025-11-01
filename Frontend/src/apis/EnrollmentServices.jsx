@@ -17,10 +17,40 @@ export const createEnrollment = async (payload, token) => {
   const res = await axiosConfig.post(`/api/enrollments`, payload, config);
   return res.data;
 };
-    
+
 export const getFreeEnrollments = async (token, data) => {
   const res = await axiosConfig.post(`/api/enrollments/free`, data, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  return res.data;
+};
+
+// Patch enrollment progress: PATCH /api/enrollments/{id}/progress?progressPercentage={value}
+export const patchEnrollmentProgress = async (
+  enrollmentId,
+  progressPercentage,
+  token
+) => {
+  const res = await axiosConfig.patch(
+    `/api/enrollments/${enrollmentId}/progress`,
+    null,
+    {
+      params: { progressPercentage },
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return res.data;
+};
+
+// Patch enrollment status: PATCH /api/enrollments/{id}/status?status=completed
+export const patchEnrollmentStatus = async (enrollmentId, status, token) => {
+  const res = await axiosConfig.patch(
+    `/api/enrollments/${enrollmentId}/status`,
+    null,
+    {
+      params: { status },
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
   return res.data;
 };

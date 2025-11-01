@@ -92,9 +92,19 @@ export const Course = () => {
     const token = localStorage.getItem("token");
     const values = await form.validateFields();
 
+    // normalize category: allow multi-select but send both formats to backend
+    const categoryValue = values.category;
     const data = {
       mentor: { id: userData?.mentor?.id },
       ...values,
+      category: Array.isArray(categoryValue)
+        ? categoryValue.join(", ")
+        : categoryValue,
+      categories: Array.isArray(categoryValue)
+        ? categoryValue
+        : categoryValue
+        ? [categoryValue]
+        : [],
     };
 
     try {
@@ -174,7 +184,7 @@ export const Course = () => {
       render: (text) => (
         <div>
           <div className="text-sm uppercase font-medium text-black-600">
-            {text || "NULL"}
+            {Array.isArray(text) ? text.join(", ") || "NULL" : text || "NULL"}
           </div>
         </div>
       ),
@@ -231,7 +241,12 @@ export const Course = () => {
                 description: record.description,
                 price: record.price,
                 level: record.level,
-                category: record.category,
+                // ensure category is an array for multiple-select
+                category: Array.isArray(record.category)
+                  ? record.category
+                  : record.category
+                  ? [record.category]
+                  : [],
                 tags: record.tags,
                 totalLessons: record.totalLessons,
                 durationHours: record.durationHours,
@@ -310,12 +325,20 @@ export const Course = () => {
     if (!editingCourse) return;
     try {
       const token = localStorage.getItem("token");
+      const categoryValue = values.category;
       const payload = {
         title: values.title,
         description: values.description,
         price: Number(values.price) || 0,
         level: values.level,
-        category: values.category,
+        category: Array.isArray(categoryValue)
+          ? categoryValue.join(", ")
+          : categoryValue,
+        categories: Array.isArray(categoryValue)
+          ? categoryValue
+          : categoryValue
+          ? [categoryValue]
+          : [],
         tags: values.tags,
         totalLessons: values.totalLessons,
         durationHours: values.durationHours,
@@ -445,7 +468,11 @@ export const Course = () => {
               name="category"
               rules={[{ required: true, message: "Please select category" }]}
             >
-              <Select placeholder="Select category" size="large">
+              <Select
+                placeholder="Select category"
+                size="large"
+                mode="multiple"
+              >
                 <Select.Option value="Web Development">
                   Web Development
                 </Select.Option>
@@ -565,7 +592,11 @@ export const Course = () => {
               name="category"
               rules={[{ required: true, message: "Please select category" }]}
             >
-              <Select placeholder="Select category" size="large">
+              <Select
+                placeholder="Select category"
+                size="large"
+                mode="multiple"
+              >
                 <Select.Option value="Web Development">
                   Web Development
                 </Select.Option>

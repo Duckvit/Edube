@@ -221,8 +221,25 @@ export const LearnerDashboard = () => {
   // console.log("📘 All courses:", allCourses);
   // console.log("📘 Filtered courses:", filteredAllCourses);
 
-  const categories = [...new Set(allCourses.map((course) => course.category))];
-  const levels = [...new Set(allCourses.map((course) => course.level))];
+  const categories = React.useMemo(() => {
+    const s = new Set();
+    allCourses.forEach((course) => {
+      if (Array.isArray(course.category)) {
+        course.category.forEach((c) => c && s.add(c));
+      } else if (course.category) {
+        s.add(course.category);
+      }
+    });
+    return Array.from(s);
+  }, [allCourses]);
+
+  const levels = React.useMemo(() => {
+    const s = new Set();
+    allCourses.forEach((course) => {
+      if (course.level) s.add(course.level);
+    });
+    return Array.from(s);
+  }, [allCourses]);
 
   const MyLearningTab = () => (
     <div>
@@ -279,9 +296,12 @@ export const LearnerDashboard = () => {
               hoverable
               className="h-full flex flex-col"
               cover={
-                <div className="h-40 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                  <BookOutlined style={{ fontSize: 48, color: "white" }} />
-                </div>
+                // use shared thumbnail image for course cover
+                <img
+                  src="/Course_Thumbnail.png"
+                  alt="Course Thumbnail"
+                  className="w-full h-40 object-cover rounded-t-lg"
+                />
               }
               styles={{
                 body: {
@@ -430,8 +450,12 @@ export const LearnerDashboard = () => {
               hoverable
               className="h-full flex flex-col"
               cover={
-                <div className="h-40 bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center relative">
-                  <BookOutlined style={{ fontSize: 48, color: "white" }} />
+                <div className="relative">
+                  <img
+                    src="/Course_Thumbnail.png"
+                    alt="Course Thumbnail"
+                    className="w-full h-40 object-cover rounded-t-lg"
+                  />
                   {course.enrolled && (
                     <div className="absolute top-2 right-2">
                       <Tag color="green" icon={<CheckCircleOutlined />}>
@@ -452,7 +476,11 @@ export const LearnerDashboard = () => {
             >
               <div className="flex flex-col h-full">
                 <div className="mb-2">
-                  <Tag color="blue">{course.category}</Tag>
+                  <Tag color="blue">
+                    {Array.isArray(course.category)
+                      ? course.category.join(", ")
+                      : course.category}
+                  </Tag>
                   <Tag color="orange">{course.level}</Tag>
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
@@ -565,7 +593,8 @@ export const LearnerDashboard = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, {userData?.fullName || userData?.username || "Learner"}!
+            Welcome back,{" "}
+            {userData?.fullName || userData?.username || "Learner"}!
           </h1>
           <p className="text-gray-600">
             Continue your learning journey or discover new courses

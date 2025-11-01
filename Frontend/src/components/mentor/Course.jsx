@@ -134,7 +134,8 @@ export const Course = () => {
       setIsCreateModalVisible(false);
       form.resetFields();
 
-      navigate(`/mentor/courses/${newCourse.id}/builder`);
+      // navigate to the course builder route (singular 'course' to match App route)
+      navigate(`/mentor/course/${newCourse.id}/builder`);
     } catch (error) {
       message.error("Failed to create course");
     }
@@ -294,7 +295,7 @@ export const Course = () => {
         key: "edit",
         label: "Edit Content",
         icon: <EditOutlined />,
-        onClick: () => navigate(`/mentor/courses/${record.id}/builder`),
+        onClick: () => navigate(`/mentor/course/${record.id}/builder`),
       },
       {
         key: "view",
@@ -390,7 +391,7 @@ export const Course = () => {
         dataSource={courses}
         rowKey="id"
         onRow={(record) => ({
-          onClick: () => navigate(`/mentor/courses/${record.id}/builder`),
+          onClick: () => navigate(`/mentor/course/${record.id}/builder`),
         })}
         pagination={{
           current: page + 1,

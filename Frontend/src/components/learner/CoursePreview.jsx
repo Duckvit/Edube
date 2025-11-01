@@ -301,9 +301,9 @@ const CoursePreview = () => {
               />
 
               <div className="mt-6 text-center">
-                <div className="mb-4 text-2xl font-bold text-gray-900">
+                {/* <div className="mb-4 text-2xl font-bold text-gray-900">
                   {course.price ? `${course.price.toLocaleString("vi-VN")}` : "Free"}
-                </div>
+                </div> */}
 
                 {course.enrolled ? (
                   <Button

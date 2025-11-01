@@ -226,7 +226,7 @@ const CourseBuilder = () => {
     setEditingVideo(null);
     // videoForm.resetFields();
     // setIsVideoModalVisible(true);
-    navigate(`${path.MENTOR_UPLOAD_LESSON}/${sectionId}`);
+    navigate(`upload-lesson/${sectionId}`);
   };
 
   const handleEditVideo = (sectionId, video) => {

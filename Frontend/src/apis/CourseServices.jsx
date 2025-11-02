@@ -36,23 +36,23 @@ export const createCourse = async (token, data) => {
   return res;
 };
 
-export const updateCourse = async (token, data) => {
+export const updateCourse = async (token, id, data) => {
   const res = await axiosConfig.put(`/api/courses/${id}`, data, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  return res;
+  return res.data;
 };
 
-export const deleteCourse = async (id, token) => {
+export const deleteCourse = async (token, id) => {
   const res = await axiosConfig.delete(`/api/courses/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  return res;
+  return res.data;
 };
 
-export const activeCourse = async (id, token) => {
+export const activeCourse = async (token, id) => {
   const res = await axiosConfig.post(`/api/courses/${id}/approve`, null, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  return res;
+  return res.data;
 };

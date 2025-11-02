@@ -22,7 +22,11 @@ import {
   ArrowLeftOutlined,
 } from "@ant-design/icons";
 import { getCourseById } from "../../apis/CourseServices";
-import { getEnrollmentsByLearner } from "../../apis/EnrollmentServices";
+import {
+  getEnrollmentsByLearner,
+  patchEnrollmentProgress,
+  patchEnrollmentStatus,
+} from "../../apis/EnrollmentServices";
 import { useUserStore } from "../../store/useUserStore";
 import useAiStore from "../../store/useAiStore";
 
@@ -34,11 +38,20 @@ const CourseDetail = () => {
   const navigate = useNavigate();
   const { id: courseId } = useParams();
   const [activeTab, setActiveTab] = useState("overview");
-  const [selectedLesson, setSelectedLesson] = useState(null); // { sectionIndex, lessonIndex, lesson }
+  // selected lesson by section and index
+  const [currentLesson, setCurrentLesson] = useState(0);
+  const [selectedSectionIndex, setSelectedSectionIndex] = useState(0);
+  const [selectedLessonIndex, setSelectedLessonIndex] = useState(0);
+  const [hasUserClickedLesson, setHasUserClickedLesson] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [enrollmentId, setEnrollmentId] = useState(null);
   const [course, setCourse] = useState("");
   const userData = useUserStore((s) => s.userData);
+  const firstSection = course.curriculum?.[0];
+  const firstLesson = firstSection?.lessons?.[currentLesson];
+  const selectedLesson =
+    course.curriculum?.[selectedSectionIndex]?.lessons?.[selectedLessonIndex];
 
   useEffect(() => {
     let mounted = true;
@@ -88,11 +101,17 @@ const CourseDetail = () => {
           );
           if (match) {
             progressPercentage = match.progressPercentage ?? 0;
+            // store enrollment id for progress updates
+            if (match.id) setEnrollmentId(match.id);
+            // normalize status to FE shape: map ACTIVE -> IN PROGRESS
+            mapped.enrollmentStatus =
+              match.status === "ACTIVE" ? "IN PROGRESS" : match.status || null;
           }
         } catch (e) {
           console.error("Failed to fetch enrollment for course detail", e);
         }
 
+        // mark lessons as unlocked and compute completed based on progressPercentage
         // mark lessons as unlocked and compute completed based on progressPercentage
         const totalLessons =
           mapped.totalLessons ||
@@ -121,20 +140,15 @@ const CourseDetail = () => {
         mapped.progress = Math.round(progressPercentage || 0);
         mapped.completedLessons = completedCount;
 
+        // ensure selected indices are valid (reset to first available)
         if (mounted) {
-          setCourse(mapped);
-          // Auto-select first lesson if available
-          if (curriculum.length > 0 && curriculum[0].lessons?.length > 0) {
-            const firstLesson = curriculum[0].lessons[0];
-            if (!firstLesson.locked) {
-              setSelectedLesson({
-                sectionIndex: 0,
-                lessonIndex: 0,
-                lesson: firstLesson,
-              });
-            }
-          }
+          setSelectedSectionIndex(0);
+          setSelectedLessonIndex(0);
+          // ensure we don't send an update to server until the learner actually clicks a lesson
+          setHasUserClickedLesson(false);
         }
+
+        if (mounted) setCourse(mapped);
       } catch (err) {
         console.error("Failed to load course detail", err);
       }
@@ -332,6 +346,213 @@ const CourseDetail = () => {
     setProgress(percent);
   };
 
+  // Render lesson content based on its contentUrl or contentText
+  const renderLessonContent = (lesson) => {
+    if (!lesson) {
+      return (
+        <div className="flex flex-col items-center justify-center text-white">
+          <PlayCircleOutlined style={{ fontSize: 64 }} />
+          <p className="mt-4 text-lg font-semibold">No lesson selected</p>
+        </div>
+      );
+    }
+
+    const url = lesson.contentUrl;
+    if (url) {
+      const lower = String(url).toLowerCase();
+      const isVideo = /\.(mp4|webm|ogg|m3u8|mpd)(\?.*)?$/.test(lower);
+      const isPdf = /\.pdf(\?.*)?$/.test(lower);
+      const isDoc = /\.(docx?|pptx?|xlsx?)(\?.*)?$/.test(lower);
+
+      if (isVideo) {
+        return (
+          <video
+            src={url}
+            controls
+            autoPlay
+            onTimeUpdate={handleTimeUpdate}
+            className="w-full h-full object-contain rounded-lg bg-black"
+          />
+        );
+      }
+
+      if (isPdf) {
+        return (
+          <iframe src={url} title={lesson.title} className="w-full h-full" />
+        );
+      }
+
+      if (isDoc) {
+        const viewer = `https://docs.google.com/gview?url=${encodeURIComponent(
+          url
+        )}&embedded=true`;
+        return (
+          <iframe src={viewer} title={lesson.title} className="w-full h-full" />
+        );
+      }
+
+      // fallback: try iframe
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center">
+          <iframe src={url} title={lesson.title} className="w-full h-full" />
+        </div>
+      );
+    }
+
+    if (lesson.contentText) {
+      return (
+        <div className="prose max-w-none p-4 overflow-auto text-white">
+          <div className="bg-white text-black p-4 rounded">
+            {lesson.contentText}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="text-white text-center p-4">
+        No preview available for this lesson.
+      </div>
+    );
+  };
+
+  // helper: compute linear lesson index (0-based) from section/lesson indices
+  const getLinearIndex = (curriculum, sectionIdx, lessonIdx) => {
+    if (!curriculum) return 0;
+    let idx = 0;
+    for (let s = 0; s < curriculum.length; s++) {
+      const lessons = curriculum[s].lessons || [];
+      if (s < sectionIdx) {
+        idx += lessons.length;
+      } else if (s === sectionIdx) {
+        idx += Math.max(0, lessonIdx);
+        break;
+      } else break;
+    }
+    return idx;
+  };
+
+  // update progress on server when selected lesson changes (skip initial mount)
+  useEffect(() => {
+    let mounted = true;
+    const doUpdate = async () => {
+      try {
+        // Only update when we have an enrollment and the user actually clicked a lesson
+        if (!enrollmentId || !hasUserClickedLesson) return;
+
+        const curriculum = course.curriculum || [];
+        const totalLessons =
+          course.totalLessons ||
+          curriculum.reduce((a, s) => a + (s.lessons?.length || 0), 0) ||
+          1;
+        const linearIdx = getLinearIndex(
+          curriculum,
+          selectedSectionIndex,
+          selectedLessonIndex
+        );
+        const completedLessons = Math.min(totalLessons, linearIdx + 1);
+        const percent = Math.round((completedLessons / totalLessons) * 100);
+
+        // if computed completedLessons is not greater than existing completedLessons, skip update
+        const existingCompleted = course.completedLessons || 0;
+        if (completedLessons <= existingCompleted) return;
+
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        // call patch API
+        await patchEnrollmentProgress(enrollmentId, percent, token);
+
+        // After server update, re-fetch enrollment(s) to get authoritative progress and reflect it
+        const learnerId = userData?.id || useUserStore.getState().userData?.id;
+        if (learnerId) {
+          try {
+            const enrollments = await getEnrollmentsByLearner(learnerId, token);
+            const enrollList = Array.isArray(enrollments)
+              ? enrollments
+              : enrollments?.data || enrollments?.content || [];
+            const match = enrollList.find(
+              (e) => String(e.course?.id) === String(course.id)
+            );
+            if (match) {
+              const progressPercentage = match.progressPercentage ?? 0;
+              const total =
+                course.totalLessons ||
+                (course.curriculum || []).reduce(
+                  (acc, s) => acc + (s.lessons?.length || 0),
+                  0
+                );
+              const completedFromServer = Math.round(
+                ((progressPercentage || 0) / 100) * (total || 1)
+              );
+
+              if (mounted) {
+                const updated = { ...course };
+                updated.progress = Math.round(progressPercentage || 0);
+                updated.completedLessons = completedFromServer;
+                let assigned2 = 0;
+                updated.curriculum = (updated.curriculum || []).map(
+                  (section) => {
+                    const lessons = (section.lessons || []).map((lesson) => {
+                      const completed = assigned2 < completedFromServer;
+                      assigned2 += 1;
+                      return { ...lesson, completed, locked: false };
+                    });
+                    return { ...section, lessons };
+                  }
+                );
+                // map status shape from server: ACTIVE -> IN PROGRESS
+                updated.enrollmentStatus =
+                  match.status === "ACTIVE"
+                    ? "IN PROGRESS"
+                    : match.status || null;
+                setCourse(updated);
+                // update enrollmentId if newly available
+                if (match.id) setEnrollmentId(match.id);
+                // if the learner just reached 100% and server status not completed, update status
+                if (
+                  Math.round(progressPercentage || 0) === 100 &&
+                  String(match.status || "").toUpperCase() !== "COMPLETED"
+                ) {
+                  try {
+                    await patchEnrollmentStatus(
+                      match.id || enrollmentId,
+                      "completed",
+                      token
+                    );
+                  } catch (err) {
+                    console.error(
+                      "Failed to update enrollment status to completed:",
+                      err
+                    );
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Failed to refresh enrollment after patch", e);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to patch enrollment progress:", err);
+      }
+    };
+
+    // only update when course exists, enrollmentId is set and user clicked a lesson
+    if (course && enrollmentId !== null && hasUserClickedLesson) {
+      doUpdate();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [
+    selectedSectionIndex,
+    selectedLessonIndex,
+    enrollmentId,
+    hasUserClickedLesson,
+  ]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Course Header */}
@@ -396,53 +617,8 @@ const CourseDetail = () => {
           {/* Video Player */}
           <div className="lg:col-span-2">
             <Card className="mb-6">
-              <div
-                className={`aspect-video rounded-lg flex flex-col items-center justify-center mb-4 
-    ${!isPlaying ? "bg-black" : ""}`}
-              >
-                {!selectedLesson ? (
-                  <div className="flex flex-col items-center justify-center text-white">
-                    <p className="text-lg font-semibold">No lesson selected</p>
-                    <p className="text-sm opacity-75">
-                      Please select a lesson from the curriculum
-                    </p>
-                  </div>
-                ) : !isPlaying ? (
-                  <div
-                    className="flex flex-col items-center justify-center text-white cursor-pointer"
-                    onClick={() => setIsPlaying(true)}
-                  >
-                    <PlayCircleOutlined style={{ fontSize: 64 }} />
-                    <p className="mt-4 text-lg font-semibold">Video Player</p>
-                    <p className="text-sm opacity-75">
-                      {selectedLesson.lesson?.title || "No lesson available"}
-                    </p>
-                  </div>
-                ) : (
-                  // Khi click play thì hiện video
-                  <div className="w-full">
-                    <video
-                      width="100%"
-                      height="100%"
-                      controls
-                      autoPlay
-                      onTimeUpdate={handleTimeUpdate}
-                      className="rounded-lg"
-                      src={
-                        selectedLesson.lesson?.contentUrl ||
-                        selectedLesson.lesson?.videoUrl ||
-                        ""
-                      }
-                    >
-                      Trình duyệt không hỗ trợ video.
-                    </video>
-
-                    {/* Hiện progress */}
-                    {/* <div className="w-1/2 mt-4 mx-auto">
-                      <Progress percent={Math.round(progress)} />
-                    </div> */}
-                  </div>
-                )}
+              <div className="aspect-video rounded-lg bg-black mb-4 flex items-center justify-center">
+                {renderLessonContent(selectedLesson)}
               </div>
             </Card>
 
@@ -486,58 +662,46 @@ const CourseDetail = () => {
                         )}
                         <List
                           dataSource={section.lessons || []}
-                          renderItem={(lesson, index) => {
-                            const isSelected =
-                              selectedLesson?.sectionIndex === sectionIndex &&
-                              selectedLesson?.lessonIndex === index;
-                            return (
-                              <List.Item
-                                className={`cursor-pointer hover:bg-gray-50 px-2 py-3 rounded transition-colors ${
-                                  lesson.locked ? "opacity-50" : ""
-                                } ${
-                                  isSelected
-                                    ? "bg-blue-50 border-l-4 border-blue-500"
-                                    : ""
-                                }`}
-                                onClick={() => {
-                                  if (!lesson.locked) {
-                                    setSelectedLesson({
-                                      sectionIndex,
-                                      lessonIndex: index,
-                                      lesson: lesson,
-                                    });
-                                    setIsPlaying(false); // Reset video player when changing lesson
-                                  }
-                                }}
-                              >
-                                <div className="flex items-center justify-between w-full">
-                                  <div className="flex items-center space-x-3">
-                                    {lesson.locked ? (
-                                      <LockOutlined className="text-gray-400" />
-                                    ) : lesson.completed ? (
-                                      <CheckCircleOutlined className="text-green-500" />
-                                    ) : (
-                                      <PlayCircleOutlined className="text-blue-500" />
-                                    )}
-                                    <div>
-                                      <div className="font-medium text-sm">
-                                        {lesson.title}
-                                      </div>
-                                      <div className="text-xs text-gray-500">
-                                        {lesson.duration}
-                                      </div>
+                          renderItem={(lesson, index) => (
+                            <List.Item
+                              className={`cursor-pointer hover:bg-gray-50 px-2 py-3 rounded ${
+                                lesson.locked ? "opacity-50" : ""
+                              }`}
+                              onClick={() => {
+                                if (!lesson.locked) {
+                                  // mark that the user actively clicked a lesson so we trigger a server update
+                                  setHasUserClickedLesson(true);
+                                  setSelectedSectionIndex(sectionIndex);
+                                  setSelectedLessonIndex(index);
+                                }
+                              }}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <div className="flex items-center space-x-3">
+                                  {lesson.locked ? (
+                                    <LockOutlined className="text-gray-400" />
+                                  ) : lesson.completed ? (
+                                    <CheckCircleOutlined className="text-green-500" />
+                                  ) : (
+                                    <PlayCircleOutlined className="text-blue-500" />
+                                  )}
+                                  <div>
+                                    <div className="font-medium text-sm">
+                                      {lesson.title}
                                     </div>
-                                  </div>
-                                </div>
-                              </List.Item>
-                            );
-                          }}
-                        />
-                      </div>
-                    ),
-                  })
-                )}
-              />
+                                    <div className="text-xs text-gray-500">
+                                              {lesson.duration}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </List.Item>
+          )}
+        />
+      </div>
+    ),
+  }))}
+/>
             </Card>
           </div>
         </div>

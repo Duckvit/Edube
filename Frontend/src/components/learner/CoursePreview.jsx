@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card, Button, Rate, Collapse, List } from "antd";
+import { Card, Button, Rate, Collapse, List, Modal } from "antd";
 import { createPayment } from "../../apis/PaymentServices";
-import { createEnrollment, getFreeEnrollments } from "../../apis/EnrollmentServices";
+import {
+  createEnrollment,
+  getFreeEnrollments,
+} from "../../apis/EnrollmentServices";
 import { toast } from "react-toastify";
 import {
   PlayCircleOutlined,
@@ -21,6 +24,7 @@ const CoursePreview = () => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedLesson, setSelectedLesson] = useState(null);
 
   // ✅ Fetch dữ liệu thật từ API
   useEffect(() => {
@@ -193,7 +197,18 @@ const CoursePreview = () => {
           {/* Left: Course Info */}
           <div className="lg:col-span-2">
             <Card className="mb-6">
-              <div className="aspect-video rounded-lg flex items-center justify-center bg-black text-white">
+              <div
+                className="aspect-video rounded-lg flex items-center justify-center bg-black text-white cursor-pointer"
+                onClick={() => {
+                  const firstLesson = course?.curriculum?.[0]?.lessons?.[0];
+                  if (
+                    firstLesson &&
+                    (firstLesson.contentUrl || firstLesson.contentText)
+                  ) {
+                    setSelectedLesson(firstLesson);
+                  }
+                }}
+              >
                 <div className="flex flex-col items-center">
                   <PlayCircleOutlined style={{ fontSize: 64 }} />
                   <p className="mt-4 text-lg font-semibold">Course Preview</p>
@@ -262,9 +277,8 @@ const CoursePreview = () => {
                             }`}
                             onClick={() => {
                               if (!isPlayable) return;
-                              navigate(
-                                `/learner/course-detail/${id}?lesson=${lesson.id}`
-                              );
+                              // Play preview video inline modal instead of navigating
+                              setSelectedLesson(lesson);
                             }}
                           >
                             <div className="flex items-center space-x-3">
@@ -300,10 +314,36 @@ const CoursePreview = () => {
                 }))}
               />
 
+              {/* Preview player modal: plays only on preview page */}
+              <Modal
+                open={!!selectedLesson}
+                title={selectedLesson?.title || "Preview"}
+                onCancel={() => setSelectedLesson(null)}
+                footer={null}
+                width={800}
+                centered
+              >
+                {selectedLesson && selectedLesson.contentUrl ? (
+                  <div className="w-full">
+                    <video
+                      src={selectedLesson.contentUrl}
+                      controls
+                      className="w-full h-96 bg-black"
+                    />
+                  </div>
+                ) : selectedLesson && selectedLesson.contentText ? (
+                  <div className="prose max-w-none">
+                    <p>{selectedLesson.contentText}</p>
+                  </div>
+                ) : (
+                  <div>No preview available for this lesson.</div>
+                )}
+              </Modal>
+
               <div className="mt-6 text-center">
-                <div className="mb-4 text-2xl font-bold text-gray-900">
+                {/* <div className="mb-4 text-2xl font-bold text-gray-900">
                   {course.price ? `${course.price.toLocaleString("vi-VN")}` : "Free"}
-                </div>
+                </div> */}
 
                 {course.enrolled ? (
                   <Button

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { courseData } from "../../utils/mockData";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -35,13 +34,11 @@ const CourseDetail = () => {
   const navigate = useNavigate();
   const { id: courseId } = useParams();
   const [activeTab, setActiveTab] = useState("overview");
-  const [currentLesson, setCurrentLesson] = useState(0);
+  const [selectedLesson, setSelectedLesson] = useState(null); // { sectionIndex, lessonIndex, lesson }
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [course, setCourse] = useState("");
   const userData = useUserStore((s) => s.userData);
-  const firstSection = course.curriculum?.[0];
-  const firstLesson = firstSection?.lessons?.[currentLesson];
 
   useEffect(() => {
     let mounted = true;
@@ -53,11 +50,10 @@ const CourseDetail = () => {
         const mapped = {
           id: c.id || c.courseId || c._id || courseId,
           title: c.title || c.name || "Untitled Course",
-          instructor:
-            c.instructor || c.author || c.mentor?.user?.fullName || "Unknown",
+          instructor: c.instructor || c.mentor?.user?.fullName || "Unknown",
           description: c.description || c.summary || c.overview || "",
           rating: c.rating || 5,
-          students: c.totalStudents ?? c.students ?? c.enrolledCount ?? 0,
+          students: c.totalStudents ?? 0,
           duration:
             c.duration ||
             (c.durationHours
@@ -125,7 +121,20 @@ const CourseDetail = () => {
         mapped.progress = Math.round(progressPercentage || 0);
         mapped.completedLessons = completedCount;
 
-        if (mounted) setCourse(mapped);
+        if (mounted) {
+          setCourse(mapped);
+          // Auto-select first lesson if available
+          if (curriculum.length > 0 && curriculum[0].lessons?.length > 0) {
+            const firstLesson = curriculum[0].lessons[0];
+            if (!firstLesson.locked) {
+              setSelectedLesson({
+                sectionIndex: 0,
+                lessonIndex: 0,
+                lesson: firstLesson,
+              });
+            }
+          }
+        }
       } catch (err) {
         console.error("Failed to load course detail", err);
       }
@@ -391,7 +400,14 @@ const CourseDetail = () => {
                 className={`aspect-video rounded-lg flex flex-col items-center justify-center mb-4 
     ${!isPlaying ? "bg-black" : ""}`}
               >
-                {!isPlaying ? (
+                {!selectedLesson ? (
+                  <div className="flex flex-col items-center justify-center text-white">
+                    <p className="text-lg font-semibold">No lesson selected</p>
+                    <p className="text-sm opacity-75">
+                      Please select a lesson from the curriculum
+                    </p>
+                  </div>
+                ) : !isPlaying ? (
                   <div
                     className="flex flex-col items-center justify-center text-white cursor-pointer"
                     onClick={() => setIsPlaying(true)}
@@ -399,8 +415,7 @@ const CourseDetail = () => {
                     <PlayCircleOutlined style={{ fontSize: 64 }} />
                     <p className="mt-4 text-lg font-semibold">Video Player</p>
                     <p className="text-sm opacity-75">
-                      Lesson {currentLesson + 1}:{" "}
-                      {firstLesson?.title || "No lesson available"}
+                      {selectedLesson.lesson?.title || "No lesson available"}
                     </p>
                   </div>
                 ) : (
@@ -413,7 +428,11 @@ const CourseDetail = () => {
                       autoPlay
                       onTimeUpdate={handleTimeUpdate}
                       className="rounded-lg"
-                      src="https://www.w3schools.com/html/mov_bbb.mp4"
+                      src={
+                        selectedLesson.lesson?.contentUrl ||
+                        selectedLesson.lesson?.videoUrl ||
+                        ""
+                      }
                     >
                       Trình duyệt không hỗ trợ video.
                     </video>
@@ -467,36 +486,52 @@ const CourseDetail = () => {
                         )}
                         <List
                           dataSource={section.lessons || []}
-                          renderItem={(lesson, index) => (
-                            <List.Item
-                              className={`cursor-pointer hover:bg-gray-50 px-2 py-3 rounded ${
-                                lesson.locked ? "opacity-50" : ""
-                              }`}
-                              onClick={() =>
-                                !lesson.locked && setCurrentLesson(index)
-                              }
-                            >
-                              <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center space-x-3">
-                                  {lesson.locked ? (
-                                    <LockOutlined className="text-gray-400" />
-                                  ) : lesson.completed ? (
-                                    <CheckCircleOutlined className="text-green-500" />
-                                  ) : (
-                                    <PlayCircleOutlined className="text-blue-500" />
-                                  )}
-                                  <div>
-                                    <div className="font-medium text-sm">
-                                      {lesson.title}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {lesson.duration}
+                          renderItem={(lesson, index) => {
+                            const isSelected =
+                              selectedLesson?.sectionIndex === sectionIndex &&
+                              selectedLesson?.lessonIndex === index;
+                            return (
+                              <List.Item
+                                className={`cursor-pointer hover:bg-gray-50 px-2 py-3 rounded transition-colors ${
+                                  lesson.locked ? "opacity-50" : ""
+                                } ${
+                                  isSelected
+                                    ? "bg-blue-50 border-l-4 border-blue-500"
+                                    : ""
+                                }`}
+                                onClick={() => {
+                                  if (!lesson.locked) {
+                                    setSelectedLesson({
+                                      sectionIndex,
+                                      lessonIndex: index,
+                                      lesson: lesson,
+                                    });
+                                    setIsPlaying(false); // Reset video player when changing lesson
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center space-x-3">
+                                    {lesson.locked ? (
+                                      <LockOutlined className="text-gray-400" />
+                                    ) : lesson.completed ? (
+                                      <CheckCircleOutlined className="text-green-500" />
+                                    ) : (
+                                      <PlayCircleOutlined className="text-blue-500" />
+                                    )}
+                                    <div>
+                                      <div className="font-medium text-sm">
+                                        {lesson.title}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {lesson.duration}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            </List.Item>
-                          )}
+                              </List.Item>
+                            );
+                          }}
                         />
                       </div>
                     ),

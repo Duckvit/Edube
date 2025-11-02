@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { getAllCourses, createCourse } from "../../apis/CourseServices";
+import {
+  getAllCourses,
+  getAllCoursesByMentorId,
+  createCourse,
+} from "../../apis/CourseServices";
 import { useUserStore } from "../../store/useUserStore";
 import { Plus, Search, Filter } from "lucide-react";
 import {
@@ -48,7 +52,13 @@ export const Course = () => {
   const fetchCourses = async () => {
     const token = localStorage.getItem("token");
     try {
-      const data = await getAllCourses(page, size, token);
+      if (!userData?.mentor?.id) {
+        console.error("Không tìm thấy mentorId trong userData");
+        return;
+      }
+
+      const mentorId = userData.mentor.id; // ✅ lấy mentorId từ userData
+      const data = await getAllCoursesByMentorId(mentorId, token); // truyền đúng
       setCourses(data.content || []);
     } catch (err) {
       console.error("Error fetching courses:", err);
@@ -294,6 +304,9 @@ export const Course = () => {
         columns={columns}
         dataSource={courses}
         rowKey="id"
+        onRow={(record) => ({
+          onClick: () => navigate(`/mentor/course/${record.id}/builder`),
+        })}
         pagination={{
           pageSize: 10,
           showSizeChanger: true,

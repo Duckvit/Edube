@@ -5,7 +5,7 @@ export const uploadLesson = (data, token, config = {}) => {
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  return axiosConfig.post("/api/mentor/lesson/upload", data, {
+  return axiosConfig.post("/api/lessons/upload", data, {
     ...config,
     headers,
   });

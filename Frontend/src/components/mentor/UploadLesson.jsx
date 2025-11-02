@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useParams } from "react-router-dom";
 import { Button, message } from "antd";
 import {
   Plus,
@@ -31,7 +32,7 @@ export const UploadLesson = () => {
   const [materials, setMaterials] = useState([]);
   const navigate = useNavigate();
   const token = useUserStore((s) => s.token);
-  const [sectionId, setSectionId] = useState(2);
+  const { sectionId } = useParams();
   const docInputRef = useRef(null);
 
   const handleUpload = (e) => {
@@ -96,7 +97,9 @@ export const UploadLesson = () => {
       const res = await uploadLesson(formData, token, {
         onUploadProgress: (progressEvent) => {
           if (!progressEvent.total) return;
-          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
           setUploadProgress(percent);
         },
       }); // gọi API
@@ -170,7 +173,7 @@ export const UploadLesson = () => {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-4">
             <Button
-              onClick={() => navigate(`/mentor/course/${courseId}/builder`)}
+              onClick={() => navigate(-1)}
               className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-6 h-6 text-slate-600" />
@@ -285,7 +288,11 @@ export const UploadLesson = () => {
                     </p>
                     <input
                       type="file"
-                      accept={contentType === "video" ? "video/*" : ".pdf,.doc,.docx,.ppt,.pptx,.txt,image/*"}
+                      accept={
+                        contentType === "video"
+                          ? "video/*"
+                          : ".pdf,.doc,.docx,.ppt,.pptx,.txt,image/*"
+                      }
                       multiple
                       className="hidden"
                       id="video-upload"
@@ -384,7 +391,7 @@ export const UploadLesson = () => {
                     </p>
                     <input
                       type="file"
-                      accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,image/*"
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.txt,image/*"
                       multiple
                       className="hidden"
                       id="doc-upload"
@@ -393,7 +400,9 @@ export const UploadLesson = () => {
                     />
                     <button
                       type="button"
-                      onClick={() => docInputRef.current && docInputRef.current.click()}
+                      onClick={() =>
+                        docInputRef.current && docInputRef.current.click()
+                      }
                       className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-colors text-sm font-medium"
                     >
                       <Upload className="w-4 h-4" />

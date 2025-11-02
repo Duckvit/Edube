@@ -55,18 +55,20 @@ const CourseBuilder = () => {
   const firstSection = course.curriculum?.[0];
 
   useEffect(() => {
-    const fetchData = async () => {
-      const token = localStorage.getItem("token");
+    const fetchSections = async () => {
       try {
+        const token = localStorage.getItem("token");
         const data = await getSectionByCourseId(courseId, token);
-        setSections(data?.sections || data || []);
-      } catch (err) {
-        console.error("❌ Error fetching sections:", err);
-        toast.error("Failed to load sections");
+        // Lấy đúng mảng sections ra
+        setSections(data?.sections || []);
+        // Nếu muốn lấy course title riêng
+        setCourse(data?.sections?.[0]?.course || {});
+      } catch (error) {
+        console.error("Error fetching sections:", error);
+        setSections([]); // tránh lỗi reduce khi API fail
       }
     };
-
-    fetchData();
+    fetchSections();
   }, [courseId]);
 
   useEffect(() => {
@@ -114,44 +116,22 @@ const CourseBuilder = () => {
     };
   }, [courseId, userData]);
 
-  const handleUpload = async () => {
-    const token = localStorage.getItem("token");
-
-    // Tạo FormData
-    const formData = new FormData();
-    formData.append("section.id", sectionId);
-    formData.append("title", title);
-    formData.append("description", description);
-    formData.append("file", file); // file là object từ input
-
-    try {
-      const res = await uploadLesson(formData, token, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      toast.success("Lesson uploaded successfully!");
-      console.log("✅ Response:", res.data);
-    } catch (err) {
-      console.error("❌ Upload failed:", err);
-      toast.error("Failed to upload lesson!");
-    }
-  };
-
   const handleCreateSection = async () => {
     try {
       const token = localStorage.getItem("token");
       const values = await sectionForm.validateFields();
 
-      const data = {
-        course: { id: courseId },
-        ...values,
-      };
-
+      const data = { course: { id: courseId }, ...values };
       const res = await createSection(data, token);
-      toast.success("Section created successfully!");
 
-      setSections((prev) => [...prev, { ...res.section, videos: [] }]);
-      sectionForm.resetFields();
-      setIsSectionModalVisible(false);
+      if ((res.statusCode === 200 || res.statusCode === 201) && res.section) {
+        toast.success("Section created successfully!");
+        setSections((prev) => [...prev, { ...res.section, videos: [] }]);
+        sectionForm.resetFields();
+        setIsSectionModalVisible(false);
+      } else {
+        throw new Error(res.message || "Failed to create section");
+      }
     } catch (err) {
       toast.error("Failed to create section!");
       console.error("❌ Error:", err);
@@ -181,32 +161,6 @@ const CourseBuilder = () => {
     setIsSectionModalVisible(true);
   };
 
-  const handleSaveSection = async (values) => {
-    try {
-      if (editingSection) {
-        setSections(
-          sections.map((s) =>
-            s.id === editingSection.id ? { ...s, ...values } : s
-          )
-        );
-        message.success("Section updated successfully");
-      } else {
-        const newSection = {
-          id: `section-${Date.now()}`,
-          ...values,
-          orderIndex: sections.length + 1,
-          videos: [],
-        };
-        setSections([...sections, newSection]);
-        message.success("Section added successfully");
-      }
-      setIsSectionModalVisible(false);
-      sectionForm.resetFields();
-    } catch (error) {
-      message.error("Failed to save section");
-    }
-  };
-
   const handleDeleteSection = (sectionId) => {
     Modal.confirm({
       title: "Delete Section",
@@ -226,7 +180,7 @@ const CourseBuilder = () => {
     setEditingVideo(null);
     // videoForm.resetFields();
     // setIsVideoModalVisible(true);
-    navigate(`${path.MENTOR_UPLOAD_LESSON}/${sectionId}`);
+    navigate(`upload-lesson/${sectionId}`);
   };
 
   const handleEditVideo = (sectionId, video) => {
@@ -308,7 +262,11 @@ const CourseBuilder = () => {
     });
   };
 
-  const totalVideos = sections.reduce((sum, s) => sum + s.videos?.length, 0);
+  const totalVideos = (sections || []).reduce(
+    (sum, s) => sum + (s.lessons?.length || 0),
+    0
+  );
+
   const totalDuration = sections.reduce(
     (sum, s) => sum + s.videos?.reduce((vSum, v) => vSum + v.duration, 0),
     0

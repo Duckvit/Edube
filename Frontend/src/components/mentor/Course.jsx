@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
-  getAllCourses,
   getAllCoursesByMentorId,
   createCourse,
   updateCourse,
@@ -43,6 +42,8 @@ export const Course = () => {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
   const [page, setPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [size, setSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -55,27 +56,42 @@ export const Course = () => {
     level: "",
   });
 
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentCourses = courses.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+
   const fetchCourses = async () => {
     const token = localStorage.getItem("token");
-    try {
-      if (!userData?.mentor?.id) {
-        console.error("Không tìm thấy mentorId trong userData");
-        return;
-      }
+    const mentorId = userData?.mentor?.id;
+    console.log("Mentor ID:", mentorId);
+    console.log("UserData:", userData);
+    if (!mentorId) {
+      console.error("Không tìm thấy mentorId trong userData");
+      return;
+    }
 
-      const mentorId = userData.mentor.id; // ✅ lấy mentorId từ userData
-      const data = await getAllCoursesByMentorId(mentorId, token); // truyền đúng
-      setCourses(data.content || []);
-      // set total items for pagination (Spring Page format)
-      setTotalItems(data?.totalElements || data?.total || 0);
+    try {
+      setLoading(true);
+      const data = await getAllCoursesByMentorId(mentorId, token);
+      // Handle both paginated response (with content) and array response
+      const coursesList = data?.courses || [];
+
+      setCourses(coursesList);
+      setTotalItems(coursesList.length);
     } catch (err) {
       console.error("Error fetching courses:", err);
+      toast.error("Không thể tải danh sách khóa học");
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCourses(); // gọi khi trang load hoặc đổi page/size
-  }, [page, size]);
+    if (userData?.mentor?.id) {
+      fetchCourses();
+    }
+  }, [userData]);
 
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -97,12 +113,19 @@ export const Course = () => {
 
   const handleSubmit = async () => {
     const token = localStorage.getItem("token");
+    const mentorId = userData?.mentor?.id;
+
+    if (!mentorId) {
+      toast.error("Không tìm thấy thông tin mentor");
+      return;
+    }
+
     const values = await form.validateFields();
 
     // normalize category: allow multi-select but send both formats to backend
     const categoryValue = values.category;
     const data = {
-      mentor: { id: userData?.mentor?.id },
+      mentor: { id: mentorId },
       ...values,
       category: Array.isArray(categoryValue)
         ? categoryValue.join(", ")
@@ -116,9 +139,32 @@ export const Course = () => {
 
     try {
       const res = await createCourse(token, data);
-      toast.success("Course created successfully!");
+      console.log("✅ Course created response:", res);
+      
+      // Lấy course ID từ response - kiểm tra nhiều cấu trúc response khác nhau
+      const courseId = 
+        res?.data?.id || 
+        res?.data?.course?.id || 
+        res?.data?.courseId || 
+        res?.id || 
+        res?.course?.id;
+      
+      console.log("📝 Extracted course ID:", courseId);
+      
+      if (!courseId) {
+        console.error("❌ Course ID not found in response:", res);
+        toast.error("Course created but ID not found. Please refresh and try again.");
+        setIsCreateModalVisible(false);
+        await fetchCourses();
+        return;
+      }
+      
+      toast.success("Course created successfully! Redirecting to course builder...");
       setIsCreateModalVisible(false);
-      await fetchCourses();
+      form.resetFields();
+      
+      // Navigate đến CourseBuilder với course ID mới tạo
+      navigate(`/mentor/course/${courseId}/builder`);
     } catch (err) {
       console.error("❌ Error creating course:", err);
       toast.error("Failed to create course. Please try again.");
@@ -401,21 +447,21 @@ export const Course = () => {
           onClick: () => navigate(`/mentor/course/${record.id}/builder`),
         })}
         pagination={{
-          current: page + 1,
-          pageSize: size,
+          current: currentPage,
           total: totalItems,
+          pageSize: itemsPerPage,
           showSizeChanger: true,
           showQuickJumper: true,
-          pageSizeOptions: ["10", "20", "50", "100"],
+          pageSizeOptions: ["5", "10", "20", "50"],
           showTotal: (total, range) =>
             `${range[0]}-${range[1]} of ${total} courses`,
           onChange: (pageNumber, newPageSize) => {
-            // Table's pageNumber is 1-based; our API expects 0-based
-            if (newPageSize && newPageSize !== size) {
-              setSize(newPageSize);
-              setPage(0); // reset to first page when pageSize changes
+            // Nếu đổi kích thước trang (pageSize)
+            if (newPageSize !== itemsPerPage) {
+              setCurrentPage(1); // reset về trang đầu
+              setItemsPerPage(newPageSize);
             } else {
-              setPage(pageNumber - 1);
+              setCurrentPage(pageNumber);
             }
           },
         }}
@@ -655,7 +701,7 @@ export const Course = () => {
             />
           </Form.Item>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* <div className="grid grid-cols-2 gap-4">
             <Form.Item label="Total Lessons" name="totalLessons">
               <InputNumber min={0} className="w-full" />
             </Form.Item>
@@ -666,7 +712,7 @@ export const Course = () => {
 
           <Form.Item label="Tags (comma separated)" name="tags">
             <Input placeholder="e.g., java,programming,beginner,2024" />
-          </Form.Item>
+          </Form.Item> */}
 
           <Form.Item className="mb-0">
             <div className="flex justify-end space-x-2">

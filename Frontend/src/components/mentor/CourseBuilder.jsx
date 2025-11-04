@@ -4,7 +4,6 @@ import {
   createSection,
 } from "../../apis/SectionServices";
 import { getCourseById, deleteCourse } from "../../apis/CourseServices";
-import { uploadLesson } from "../../apis/LessonServices";
 import { useUserStore } from "../../store/useUserStore";
 import { toast } from "react-toastify";
 import {
@@ -27,14 +26,10 @@ import {
   DeleteOutlined,
   PlayCircleOutlined,
   FileOutlined,
-  SaveOutlined,
-  EyeOutlined,
   ArrowLeftOutlined,
-  UploadOutlined,
-  DragOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
-import path from "../../utils/path";
 
 const { Panel } = Collapse;
 const { TextArea } = Input;
@@ -56,15 +51,35 @@ const CourseBuilder = () => {
 
   useEffect(() => {
     const fetchSections = async () => {
+      if (!courseId) {
+        console.warn("⚠️ courseId is missing in fetchSections");
+        setSections([]);
+        return;
+      }
+
       try {
         const token = localStorage.getItem("token");
+        console.log(
+          "🔵 Fetching sections for courseId:",
+          courseId,
+          "type:",
+          typeof courseId
+        );
         const data = await getSectionByCourseId(courseId, token);
+        console.log("📥 Sections response:", data);
+
         // Lấy đúng mảng sections ra
-        setSections(data?.sections || []);
+        const sectionsArray = data?.sections || data || [];
+        console.log("📋 Sections array:", sectionsArray);
+        setSections(Array.isArray(sectionsArray) ? sectionsArray : []);
+
         // Nếu muốn lấy course title riêng
-        setCourse(data?.sections?.[0]?.course || {});
+        if (sectionsArray.length > 0 && sectionsArray[0]?.course) {
+          setCourse(sectionsArray[0].course);
+        }
       } catch (error) {
-        console.error("Error fetching sections:", error);
+        console.error("❌ Error fetching sections:", error);
+        console.error("Error details:", error.response || error);
         setSections([]); // tránh lỗi reduce khi API fail
       }
     };
@@ -121,8 +136,24 @@ const CourseBuilder = () => {
       const token = localStorage.getItem("token");
       const values = await sectionForm.validateFields();
 
-      const data = { course: { id: courseId }, ...values };
+      // Đảm bảo courseId là số nếu có thể
+      const courseIdNum = courseId ? Number(courseId) : null;
+      console.log(
+        "🔵 Creating section for courseId:",
+        courseId,
+        "as number:",
+        courseIdNum
+      );
+
+      if (!courseId || isNaN(courseIdNum)) {
+        toast.error("Invalid course ID. Please refresh the page.");
+        return;
+      }
+
+      const data = { course: { id: courseIdNum }, ...values };
+      console.log("📤 Creating section with data:", data);
       const res = await createSection(data, token);
+      console.log("📥 Create section response:", res);
 
       if ((res.statusCode === 200 || res.statusCode === 201) && res.section) {
         toast.success("Section created successfully!");
@@ -420,7 +451,11 @@ const CourseBuilder = () => {
                             className="flex items-center justify-between p-3 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
                           >
                             <div className="flex items-center gap-3">
-                              <PlayCircleOutlined className="text-blue-600 text-lg" />
+                              {lesson.contentType === "video" ? (
+                                <PlayCircleOutlined className="text-blue-600 text-lg" />
+                              ) : (
+                                <FileTextOutlined className="text-green-600 text-lg" />
+                              )}
                               <div>
                                 <div className="font-medium text-gray-900">
                                   {lesson.title}

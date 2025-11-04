@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import { Search, MessageCircle, Wifi, WifiOff } from "lucide-react";
@@ -15,6 +16,7 @@ import { parseJwt } from "../../utils/jwt";
 import { Card } from "antd";
 
 export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
+  const location = useLocation();
   const [selectedChat, setSelectedChat] = useState(null);
   const [connected, setConnected] = useState(false);
   const [message, setMessage] = useState("");
@@ -76,8 +78,27 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
     );
   };
 
+  // Helper: Fetch latest message for a conversation
+  const fetchLatestMessage = async (conversationId) => {
+    try {
+      if (!jwtToken || !conversationId) return null;
+      const response = await getMessages(conversationId, 0, 1);
+      const messagesList = response?.chatMessages || [];
+      
+      if (response?.statusCode === 204 || messagesList.length === 0) {
+        return null;
+      }
+      
+      // Return the first (latest) message
+      return messagesList[0];
+    } catch (error) {
+      console.error(`Error fetching latest message for conversation ${conversationId}:`, error);
+      return null;
+    }
+  };
+
   // Helper: Map conversation to UI format
-  const mapConversation = (conv) => {
+  const mapConversation = async (conv) => {
     const currentUserId = getCurrentUserId();
     const otherParticipant =
       conv.mentor?.user?.id === currentUserId
@@ -88,6 +109,8 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
         ? conv.mentor
         : conv.learner;
 
+    console.log("otherParticipant", otherParticipant);
+
     const otherName =
       otherParticipant?.user?.fullName ||
       otherParticipant?.fullName ||
@@ -96,14 +119,15 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
       conv.title ||
       "Unknown User";
 
-    const lastMessage = conv.messages?.[conv.messages.length - 1];
+    // Fetch latest message from API
+    const latestMessage = await fetchLatestMessage(conv.id);
 
     return {
       id: conv.id,
       name: otherName,
-      lastMessage: lastMessage?.message || "No messages yet",
-      lastMessageTime: lastMessage?.createdAt
-        ? new Date(lastMessage.createdAt).toLocaleTimeString()
+      lastMessage: latestMessage?.message || "No messages yet",
+      lastMessageTime: latestMessage?.createdAt
+        ? new Date(latestMessage.createdAt).toLocaleTimeString()
         : conv.lastMessageAt
         ? new Date(conv.lastMessageAt).toLocaleTimeString()
         : "--",
@@ -160,7 +184,10 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
         return;
       }
 
-      const mappedConversations = conversationsList.map(mapConversation);
+      // Map conversations with latest messages from API
+      const mappedConversations = await Promise.all(
+        conversationsList.map(mapConversation)
+      );
       setConversations(mappedConversations);
 
       if (mentorId && onCreateConversation) {
@@ -195,7 +222,7 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
         return;
       }
 
-      const response = await getMessages(conversationId, 0, 100);
+      const response = await getMessages(conversationId, 0, 20);
       const messagesList = response?.chatMessages || [];
 
       if (response?.statusCode === 204 || messagesList.length === 0) {
@@ -315,76 +342,6 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
     }
   };
 
-  // Send message
-  // const sendMessage = async () => {
-  //   if (!message.trim() || !selectedChat) return;
-
-  //   const messageText = message.trim();
-  //   const conversationId = selectedChat.id;
-  //   const senderId = getSenderId();
-
-  //   if (!senderId) {
-  //     toast.error("User information not found");
-  //     return;
-  //   }
-
-  //   const chatMessageDto = {
-  //     senderId,
-  //     message: messageText,
-  //     conversation: { id: conversationId },
-  //   };
-
-  //   const tempMessage = {
-  //     id: Date.now(),
-  //     sender: "You",
-  //     senderId,
-  //     text: messageText,
-  //     time: "Just now",
-  //     createdAt: new Date(),
-  //     isRead: false,
-  //   };
-
-  //   setSelectedChat((prev) => ({
-  //     ...prev,
-  //     messages: sortMessages([...prev.messages, tempMessage]),
-  //   }));
-  //   setMessage("");
-
-  //   if (client && connected) {
-  //     try {
-  //       client.publish({
-  //         destination: "/app/chat.send-message",
-  //         body: JSON.stringify(chatMessageDto),
-  //       });
-  //     } catch (error) {
-  //       console.error("WebSocket send error, trying REST API:", error);
-  //       try {
-  //         await sendMessageRest(conversationId, chatMessageDto);
-  //       } catch (restError) {
-  //         console.error("REST API send error:", restError);
-  //         toast.error(
-  //           restError?.response?.data?.message || "Failed to send message"
-  //         );
-  //         setSelectedChat((prev) => ({
-  //           ...prev,
-  //           messages: prev.messages.filter((msg) => msg.id !== tempMessage.id),
-  //         }));
-  //       }
-  //     }
-  //   } else {
-  //     try {
-  //       await sendMessageRest(conversationId, chatMessageDto);
-  //     } catch (error) {
-  //       console.error("REST API send error:", error);
-  //       toast.error(error?.response?.data?.message || "Failed to send message");
-  //       setSelectedChat((prev) => ({
-  //         ...prev,
-  //         messages: prev.messages.filter((msg) => msg.id !== tempMessage.id),
-  //       }));
-  //     }
-  //   }
-  // };
-
   const sendMessage = async () => {
     const token = localStorage.getItem("token");
     if (!message.trim() || !selectedChat) return;
@@ -502,6 +459,26 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
     const timer = setTimeout(() => loadConversations(), 200);
     return () => clearTimeout(timer);
   }, [userData]);
+
+  // Auto-select conversation from navigation state
+  useEffect(() => {
+    const conversationIdFromState = location?.state?.conversationId;
+    if (conversationIdFromState && conversations.length > 0 && !selectedChat) {
+      const conversationToSelect = conversations.find(
+        (conv) => conv.id === conversationIdFromState
+      );
+      if (conversationToSelect) {
+        setSelectedChat({ ...conversationToSelect, messages: conversationToSelect.messages || [] });
+        if (!conversationToSelect.messages || conversationToSelect.messages.length === 0) {
+          loadMessagesForConversation(conversationToSelect.id);
+        }
+        if (client && connected && conversationToSelect.id) {
+          subscribeToConversation(conversationToSelect.id);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversations, location?.state?.conversationId]);
 
   // Auto-scroll to bottom
   useEffect(() => {

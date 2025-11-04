@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 // import { enrolledCourses, allCourses } from "../../utils/mockData";
 import { getAllCourses } from "../../apis/CourseServices";
 import { createPayment } from "../../apis/PaymentServices";
-import { getEnrollmentsByLearner } from "../../apis/EnrollmentServices";
+import { getEnrollmentsByLearner, createFreeEnrollments } from "../../apis/EnrollmentServices";
 import { toast } from "react-toastify";
 import {
   Card,

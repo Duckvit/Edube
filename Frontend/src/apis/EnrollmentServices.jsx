@@ -18,7 +18,7 @@ export const createEnrollment = async (payload, token) => {
   return res.data;
 };
 
-export const getFreeEnrollments = async (token, data) => {
+export const createFreeEnrollments = async (token, data) => {
   const res = await axiosConfig.post(`/api/enrollments/free`, data, {
     headers: { Authorization: `Bearer ${token}` },
   });

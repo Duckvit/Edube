@@ -49,7 +49,7 @@ export const HomePage = () => {
         onCloseSignInSignUp={handleCloseSignInSignUp}
       />
       {/* Hero Section */}
-      <section id="platform" className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-900 via-sky-800 to-yellow-900 overflow-hidden">
+      <section id="platform" className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-900 via-sky-800 to-amber-900 overflow-hidden">
         <div className="absolute inset-0 bg-black/20"></div>
         {/* <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10"></div> */}
 
@@ -57,12 +57,12 @@ export const HomePage = () => {
           <div className="max-w-4xl mx-auto">
             <h1 className="text-5xl md:text-7xl font-bold text-white mb-8 leading-tight">
               Transform Your
-              <span className="block bg-gradient-to-r from-purple-300 to-blue-300 bg-clip-text text-transparent">
+              <span className="block bg-gradient-to-r from-sky-300 to-amber-300 bg-clip-text text-transparent">
                 Learning Journey
               </span>
             </h1>
 
-            <p className="text-xl md:text-2xl text-purple-100 mb-12 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-xl md:text-2xl text-sky-100 mb-12 max-w-3xl mx-auto leading-relaxed">
               Join students and educators using Edube's platform to achieve
               exceptional learning outcomes
             </p>
@@ -72,7 +72,7 @@ export const HomePage = () => {
                 <h3 className="text-lg font-semibold text-white mb-2">
                   For Students
                 </h3>
-                <p className="text-purple-100 text-sm">
+                <p className="text-sky-100 text-sm">
                   Personalized learning paths
                 </p>
               </div>
@@ -80,7 +80,7 @@ export const HomePage = () => {
                 <h3 className="text-lg font-semibold text-white mb-2">
                   For mentors
                 </h3>
-                <p className="text-purple-100 text-sm">
+                <p className="text-sky-100 text-sm">
                   Advanced content creation tools
                 </p>
               </div>
@@ -88,7 +88,7 @@ export const HomePage = () => {
                 <h3 className="text-lg font-semibold text-white mb-2">
                   For Everyone
                 </h3>
-                <p className="text-purple-100 text-sm">
+                <p className="text-sky-100 text-sm">
                   24/7 access to premium resources
                 </p>
               </div>
@@ -97,7 +97,7 @@ export const HomePage = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <button
                 onClick={() => setOpenSignUp(true)}
-                className="cursor-pointer bg-gradient-to-r from-sky-600 to-yellow-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-yellow-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                className="cursor-pointer bg-gradient-to-r from-sky-600 to-amber-500 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:from-sky-700 hover:to-amber-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
                 Start Now
               </button>
@@ -120,8 +120,8 @@ export const HomePage = () => {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="text-center p-6 rounded-xl bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-100">
-              <div className="w-12 h-12 bg-gradient-to-r from-sky-600 to-yellow-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+            <div className="text-center p-6 rounded-xl bg-gradient-to-br from-sky-50 to-amber-50 border border-sky-100 hover:shadow-lg transition-all">
+              <div className="w-12 h-12 bg-gradient-to-r from-sky-600 to-amber-500 rounded-lg mx-auto mb-4 flex items-center justify-center">
                 <Brain className="w-6 h-6 text-white" />
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-3">
@@ -137,8 +137,8 @@ export const HomePage = () => {
               </ul>
             </div>
 
-            <div className="text-center p-6 rounded-xl bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-100">
-              <div className="w-12 h-12 bg-gradient-to-r from-sky-600 to-yellow-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+            <div className="text-center p-6 rounded-xl bg-gradient-to-br from-sky-50 to-amber-50 border border-sky-100 hover:shadow-lg transition-all">
+              <div className="w-12 h-12 bg-gradient-to-r from-sky-600 to-amber-500 rounded-lg mx-auto mb-4 flex items-center justify-center">
                 <BookOpen className="w-6 h-6 text-white" />
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-3">
@@ -154,8 +154,8 @@ export const HomePage = () => {
               </ul>
             </div>
 
-            <div className="text-center p-6 rounded-xl bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-100">
-              <div className="w-12 h-12 bg-gradient-to-r from-sky-600 to-yellow-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+            <div className="text-center p-6 rounded-xl bg-gradient-to-br from-sky-50 to-amber-50 border border-sky-100 hover:shadow-lg transition-all">
+              <div className="w-12 h-12 bg-gradient-to-r from-sky-600 to-amber-500 rounded-lg mx-auto mb-4 flex items-center justify-center">
                 <Target className="w-6 h-6 text-white" />
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-3">
@@ -189,7 +189,7 @@ export const HomePage = () => {
           <div className="grid md:grid-cols-3 gap-8">
             {steps.map((step, index) => (
               <div key={index} className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-r from-sky-600 to-yellow-600 rounded-full flex items-center justify-center text-white text-xl font-bold mx-auto mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-sky-600 to-amber-500 rounded-full flex items-center justify-center text-white text-xl font-bold mx-auto mb-6 shadow-md">
                   {step.number}
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">
@@ -205,28 +205,28 @@ export const HomePage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-br from-blue-900 via-yellow-900 to-indigo-900 relative overflow-hidden">
+      <section className="py-20 bg-gradient-to-br from-sky-900 via-amber-900 to-sky-900 relative overflow-hidden">
         <div className="absolute inset-0 bg-black/20"></div>
-        <div className="absolute top-10 left-10 w-32 h-32 bg-purple-500/10 rounded-full blur-xl"></div>
-        <div className="absolute bottom-10 right-10 w-40 h-40 bg-blue-500/10 rounded-full blur-xl"></div>
+        <div className="absolute top-10 left-10 w-32 h-32 bg-sky-500/10 rounded-full blur-xl"></div>
+        <div className="absolute bottom-10 right-10 w-40 h-40 bg-amber-500/10 rounded-full blur-xl"></div>
 
         <div className="container mx-auto px-6 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
               Ready to Transform Your Learning?
             </h2>
-            <p className="text-xl text-purple-100 mb-12 max-w-2xl mx-auto">
+            <p className="text-xl text-sky-100 mb-12 max-w-2xl mx-auto">
               Join thousands of learners who are already experiencing
               personalized, AI-powered education.
             </p>
 
             <div className="grid md:grid-cols-2 gap-8 mb-12">
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                <Users className="w-12 h-12 text-purple-300 mx-auto mb-4" />
+                <Users className="w-12 h-12 text-sky-300 mx-auto mb-4" />
                 <h3 className="text-2xl font-bold text-white mb-4">
                   For Students
                 </h3>
-                <ul className="text-purple-100 space-y-2 mb-6">
+                <ul className="text-sky-100 space-y-2 mb-6">
                   <li>• Personalized learning paths</li>
                   <li>• 24/7 AI tutoring support</li>
                   <li>• Adaptive quiz system</li>
@@ -234,18 +234,18 @@ export const HomePage = () => {
                 </ul>
                 <button
                   onClick={() => setOpenSignUp(true)}
-                  className="cursor-pointer w-full bg-gradient-to-r from-blue-500 to-blue-500 text-white font-semibold py-3 px-6 rounded-xl hover:from-purple-600 hover:to-blue-600 transition-all duration-300 transform hover:scale-105"
+                  className="cursor-pointer w-full bg-gradient-to-r from-sky-600 to-sky-700 text-white font-semibold py-3 px-6 rounded-xl hover:from-sky-700 hover:to-sky-800 transition-all duration-300 transform hover:scale-105"
                 >
                   Start Learning
                 </button>
               </div>
 
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                <GraduationCap className="w-12 h-12 text-blue-300 mx-auto mb-4" />
+                <GraduationCap className="w-12 h-12 text-amber-300 mx-auto mb-4" />
                 <h3 className="text-2xl font-bold text-white mb-4">
                   For mentors
                 </h3>
-                <ul className="text-blue-100 space-y-2 mb-6">
+                <ul className="text-amber-100 space-y-2 mb-6">
                   <li>• AI-powered course creation</li>
                   <li>• Student analytics dashboard</li>
                   <li>• Automated grading system</li>
@@ -253,7 +253,7 @@ export const HomePage = () => {
                 </ul>
                 <button
                   onClick={() => setOpenSignUp(true)}
-                  className="cursor-pointer w-full bg-gradient-to-r from-blue-500 to-blue-500 text-white font-semibold py-3 px-6 rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-300 transform hover:scale-105"
+                  className="cursor-pointer w-full bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-300 transform hover:scale-105"
                 >
                   Create Your Course
                 </button>

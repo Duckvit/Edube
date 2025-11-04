@@ -324,7 +324,7 @@ export const UserProfile = () => {
                   : "Teaching Statistics"
               }
             >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {effectiveRole === "learner" ? (
                   <>
                     <div className="text-center p-4 bg-blue-50 rounded-lg">
@@ -368,14 +368,14 @@ export const UserProfile = () => {
                         Total Students
                       </div>
                     </div>
-                    <div className="text-center p-4 bg-amber-50 rounded-lg">
+                    {/* <div className="text-center p-4 bg-amber-50 rounded-lg">
                       <div className="text-3xl font-bold text-amber-600 mb-1">
                         4.9
                       </div>
                       <div className="text-sm text-gray-600">
                         Average Rating
                       </div>
-                    </div>
+                    </div> */}
                   </>
                 )}
               </div>

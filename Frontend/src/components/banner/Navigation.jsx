@@ -146,7 +146,7 @@ const Navigation = ({ children, menuNavbar, showSidebar = true }) => {
               </div>
 
               {!collapsed && (
-                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent">
+                <span className="text-2xl font-bold bg-gradient-to-r from-sky-600 to-amber-600 bg-clip-text text-transparent">
                   Edube
                 </span>
               )}
@@ -171,7 +171,7 @@ const Navigation = ({ children, menuNavbar, showSidebar = true }) => {
           {!showSidebar && (
             <div className="flex items-center gap-2 pl-4">
               <img src="/FIB_logo.png" className="object-cover h-[3vh]" />
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent">
+              <span className="text-2xl font-bold bg-gradient-to-r from-sky-600 to-amber-600 bg-clip-text text-transparent">
                 Edube
               </span>
             </div>

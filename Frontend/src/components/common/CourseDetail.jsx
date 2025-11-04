@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -27,6 +27,10 @@ import {
   patchEnrollmentProgress,
   patchEnrollmentStatus,
 } from "../../apis/EnrollmentServices";
+import {
+  createLessonProgress,
+  getLessonProgressByEnrollment,
+} from "../../apis/LessonProgressServices";
 import { useUserStore } from "../../store/useUserStore";
 import useAiStore from "../../store/useAiStore";
 
@@ -44,9 +48,14 @@ const CourseDetail = () => {
   const [selectedLessonIndex, setSelectedLessonIndex] = useState(0);
   const [hasUserClickedLesson, setHasUserClickedLesson] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [videoProgress, setVideoProgress] = useState(0); // Progress của video hiện tại
   const [isPlaying, setIsPlaying] = useState(false);
   const [enrollmentId, setEnrollmentId] = useState(null);
   const [course, setCourse] = useState("");
+  const [videoStartTime, setVideoStartTime] = useState(null); // Track start time for video
+  const [lastProgressPercent, setLastProgressPercent] = useState(0); // Track last progress percentage sent to server
+  const [lastProgressUpdateTime, setLastProgressUpdateTime] = useState(0); // Track last progress update timestamp
+  const [lessonProgressMap, setLessonProgressMap] = useState(new Map()); // Map lessonId -> progress data
   const userData = useUserStore((s) => s.userData);
   const firstSection = course.curriculum?.[0];
   const firstLesson = firstSection?.lessons?.[currentLesson];
@@ -102,7 +111,35 @@ const CourseDetail = () => {
           if (match) {
             progressPercentage = match.progressPercentage ?? 0;
             // store enrollment id for progress updates
-            if (match.id) setEnrollmentId(match.id);
+            if (match.id) {
+              setEnrollmentId(match.id);
+              // Fetch lesson progress data
+              const token = localStorage.getItem("token");
+              if (token) {
+                try {
+                  const lessonProgressList = await getLessonProgressByEnrollment(
+                    match.id,
+                    token
+                  );
+                  // Create a map of lessonId -> progress
+                  const progressMap = new Map();
+                  if (Array.isArray(lessonProgressList)) {
+                    lessonProgressList.forEach((progress) => {
+                      const lessonId =
+                        progress.lesson?.id ||
+                        progress.lessonId ||
+                        progress.lesson;
+                      if (lessonId) {
+                        progressMap.set(lessonId, progress);
+                      }
+                    });
+                  }
+                  if (mounted) setLessonProgressMap(progressMap);
+                } catch (err) {
+                  console.error("Failed to fetch lesson progress", err);
+                }
+              }
+            }
             // normalize status to FE shape: map ACTIVE -> IN PROGRESS
             mapped.enrollmentStatus =
               match.status === "ACTIVE" ? "IN PROGRESS" : match.status || null;
@@ -111,22 +148,35 @@ const CourseDetail = () => {
           console.error("Failed to fetch enrollment for course detail", e);
         }
 
-        // mark lessons as unlocked and compute completed based on progressPercentage
-        // mark lessons as unlocked and compute completed based on progressPercentage
+        // mark lessons as unlocked and compute completed based on lesson progress data
         const totalLessons =
           mapped.totalLessons ||
           (mapped.curriculum || []).reduce(
             (acc, s) => acc + (s.lessons?.length || 0),
             0
           );
-        const completedCount = Math.round(
-          ((progressPercentage || 0) / 100) * (totalLessons || 1)
-        );
+        
+        // Build curriculum with completed status
+        // Note: lessonProgressMap will be set asynchronously, so we'll update it in a separate effect
         let assigned = 0;
         const curriculum = (mapped.curriculum || []).map((section) => {
           const lessons = (section.lessons || []).map((lesson) => {
-            const completed = assigned < completedCount;
+            const lessonId =
+              lesson.id || lesson.lessonId || lesson._id || lesson.lesson?.id;
+            // Try to get from lessonProgressMap (might be empty on first load)
+            const progress = lessonId ? lessonProgressMap.get(lessonId) : null;
+            const completedFromProgress =
+              progress?.isCompleted === true ||
+              (progress?.completionPercentage ?? 0) >= 100;
+            
+            // Fallback to enrollment progress if lesson progress not available
+            const completedCount = Math.round(
+              ((progressPercentage || 0) / 100) * (totalLessons || 1)
+            );
+            const completed =
+              completedFromProgress || assigned < completedCount;
             assigned += 1;
+            
             return {
               ...lesson,
               locked: false,
@@ -135,6 +185,19 @@ const CourseDetail = () => {
           });
           return { ...section, lessons };
         });
+        
+        // Count actual completed lessons
+        let completedCount = 0;
+        curriculum.forEach((section) => {
+          section.lessons.forEach((lesson) => {
+            if (lesson.completed) completedCount++;
+          });
+        });
+        
+        // Update progress percentage based on actual completed lessons if we have lesson progress data
+        if (lessonProgressMap.size > 0 && totalLessons > 0) {
+          progressPercentage = Math.round((completedCount / totalLessons) * 100);
+        }
 
         mapped.curriculum = curriculum;
         mapped.progress = Math.round(progressPercentage || 0);
@@ -340,10 +403,311 @@ const CourseDetail = () => {
     // },
   ];
 
+  // Function to refresh lesson progress and update course curriculum
+  const refreshLessonProgressData = useCallback(async () => {
+    if (!enrollmentId) return;
+    
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const lessonProgressList = await getLessonProgressByEnrollment(
+        enrollmentId,
+        token
+      );
+      // Create a map of lessonId -> progress
+      const progressMap = new Map();
+      if (Array.isArray(lessonProgressList)) {
+        lessonProgressList.forEach((progress) => {
+          const lessonId =
+            progress.lesson?.id ||
+            progress.lessonId ||
+            progress.lesson;
+          if (lessonId) {
+            progressMap.set(lessonId, progress);
+          }
+        });
+      }
+      setLessonProgressMap(progressMap);
+      
+      // Update course curriculum with actual lesson progress
+      setCourse((prevCourse) => {
+        if (!prevCourse || !prevCourse.curriculum) return prevCourse;
+        
+        const updated = { ...prevCourse };
+        const curriculum = (updated.curriculum || []).map((section) => {
+          const lessons = (section.lessons || []).map((lesson) => {
+            const lessonId =
+              lesson.id || lesson.lessonId || lesson._id || lesson.lesson?.id;
+            const progress = lessonId ? progressMap.get(lessonId) : null;
+            const completed =
+              progress?.isCompleted === true ||
+              (progress?.completionPercentage ?? 0) >= 100;
+            
+            return {
+              ...lesson,
+              completed,
+              locked: false,
+            };
+          });
+          return { ...section, lessons };
+        });
+        
+        // Count actual completed lessons
+        let completedCount = 0;
+        curriculum.forEach((section) => {
+          section.lessons.forEach((lesson) => {
+            if (lesson.completed) completedCount++;
+          });
+        });
+        
+        updated.curriculum = curriculum;
+        updated.completedLessons = completedCount;
+        
+        const totalLessons =
+          updated.totalLessons ||
+          curriculum.reduce((acc, s) => acc + (s.lessons?.length || 0), 0);
+        if (totalLessons > 0) {
+          updated.progress = Math.round((completedCount / totalLessons) * 100);
+        }
+        
+        return updated;
+      });
+    } catch (err) {
+      console.error("Failed to refresh lesson progress", err);
+    }
+  }, [enrollmentId]);
+
+  // Helper function to create/update lesson progress
+  const updateLessonProgress = useCallback(
+    async (
+      lesson,
+      completionPercentage,
+      timeSpentMinutes = 0,
+      isCompleted = false
+    ) => {
+      if (!enrollmentId || !lesson) return;
+
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      // Get lesson ID - could be id, lessonId, or _id
+      const lessonId =
+        lesson.id || lesson.lessonId || lesson._id || lesson.lesson?.id;
+      if (!lessonId) {
+        console.warn("Lesson ID not found", lesson);
+        return;
+      }
+
+      try {
+        const progressData = {
+          enrollment: {
+            id: enrollmentId,
+          },
+          lesson: {
+            id: lessonId,
+          },
+          isCompleted: isCompleted,
+          timeSpentMinutes: timeSpentMinutes,
+          completionPercentage: parseFloat(completionPercentage.toFixed(2)),
+        };
+
+        const result = await createLessonProgress(token, progressData);
+        // Refresh lesson progress data after update (with small delay to ensure DB update)
+        if (result) {
+          setTimeout(() => {
+            refreshLessonProgressData();
+          }, 500);
+        }
+      } catch (err) {
+        console.error("Failed to update lesson progress:", err);
+      }
+    },
+    [enrollmentId, refreshLessonProgressData]
+  );
+
   const handleTimeUpdate = (e) => {
     const video = e.target;
-    const percent = (video.currentTime / video.duration) * 100;
-    setProgress(percent);
+    if (video.duration) {
+      const percent = (video.currentTime / video.duration) * 100;
+      setVideoProgress(percent);
+
+      // Track time spent (convert seconds to minutes)
+      const currentTime = video.currentTime;
+      const timeSpentMinutes = Math.floor(currentTime / 60);
+
+      // Update lesson progress periodically (every 10% or every 30 seconds)
+      const now = Date.now();
+      const shouldUpdate =
+        percent - lastProgressPercent >= 10 ||
+        now - lastProgressUpdateTime >= 30000;
+
+      if (shouldUpdate) {
+        updateLessonProgress(
+          selectedLesson,
+          percent,
+          timeSpentMinutes,
+          percent >= 100
+        );
+        setLastProgressPercent(percent);
+        setLastProgressUpdateTime(now);
+      }
+
+      // Mark as completed when video reaches 100%
+      if (percent >= 100 && !selectedLesson?.completed) {
+        updateLessonProgress(selectedLesson, 100, timeSpentMinutes, true);
+      }
+    }
+  };
+
+  // Reset video progress when lesson changes
+  useEffect(() => {
+    setVideoProgress(0);
+    setVideoStartTime(Date.now());
+    setLastProgressPercent(0);
+    setLastProgressUpdateTime(0);
+  }, [selectedSectionIndex, selectedLessonIndex]);
+
+  // Track video start time when lesson is selected
+  useEffect(() => {
+    if (selectedLesson && getContentType(selectedLesson) === "video") {
+      setVideoStartTime(Date.now());
+      // Initialize lesson progress when video starts
+      const token = localStorage.getItem("token");
+      if (token && enrollmentId) {
+        updateLessonProgress(selectedLesson, 0, 0, false);
+      }
+    }
+  }, [selectedLesson, enrollmentId, updateLessonProgress]);
+
+  // Refresh lesson progress when enrollmentId is set
+  useEffect(() => {
+    if (enrollmentId) {
+      refreshLessonProgressData();
+    }
+  }, [enrollmentId, refreshLessonProgressData]);
+
+  // Handle mark as read for documents
+  const handleMarkAsRead = async () => {
+    if (!enrollmentId || !selectedLesson) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      // Create/update lesson progress for document
+      await updateLessonProgress(selectedLesson, 100, 0, true);
+
+      const curriculum = course.curriculum || [];
+      const totalLessons =
+        course.totalLessons ||
+        curriculum.reduce((a, s) => a + (s.lessons?.length || 0), 0) ||
+        1;
+      const linearIdx = getLinearIndex(
+        curriculum,
+        selectedSectionIndex,
+        selectedLessonIndex
+      );
+      const completedLessons = Math.min(totalLessons, linearIdx + 1);
+      const percent = Math.round((completedLessons / totalLessons) * 100);
+
+      // if computed completedLessons is not greater than existing completedLessons, skip update
+      const existingCompleted = course.completedLessons || 0;
+      if (completedLessons <= existingCompleted) {
+        // Still update UI to mark as completed even if already completed
+        const updated = { ...course };
+        let assigned2 = 0;
+        updated.curriculum = (updated.curriculum || []).map((section) => {
+          const lessons = (section.lessons || []).map((lesson) => {
+            const completed = assigned2 < completedLessons;
+            assigned2 += 1;
+            return { ...lesson, completed, locked: false };
+          });
+          return { ...section, lessons };
+        });
+        setCourse(updated);
+        return;
+      }
+
+      // call patch API
+      await patchEnrollmentProgress(enrollmentId, percent, token);
+
+      // After server update, re-fetch enrollment(s) to get authoritative progress
+      const learnerId = userData?.id || useUserStore.getState().userData?.id;
+      if (learnerId) {
+        try {
+          const enrollments = await getEnrollmentsByLearner(learnerId, token);
+          const enrollList = Array.isArray(enrollments)
+            ? enrollments
+            : enrollments?.data || enrollments?.content || [];
+          const match = enrollList.find(
+            (e) => String(e.course?.id) === String(course.id)
+          );
+          if (match) {
+            const progressPercentage = match.progressPercentage ?? 0;
+            const total =
+              course.totalLessons ||
+              (course.curriculum || []).reduce(
+                (acc, s) => acc + (s.lessons?.length || 0),
+                0
+              );
+            const completedFromServer = Math.round(
+              ((progressPercentage || 0) / 100) * (total || 1)
+            );
+
+            const updated = { ...course };
+            updated.progress = Math.round(progressPercentage || 0);
+            updated.completedLessons = completedFromServer;
+            let assigned2 = 0;
+            updated.curriculum = (updated.curriculum || []).map((section) => {
+              const lessons = (section.lessons || []).map((lesson) => {
+                const completed = assigned2 < completedFromServer;
+                assigned2 += 1;
+                return { ...lesson, completed, locked: false };
+              });
+              return { ...section, lessons };
+            });
+            updated.enrollmentStatus =
+              match.status === "ACTIVE" ? "IN PROGRESS" : match.status || null;
+            setCourse(updated);
+
+            // if the learner just reached 100% and server status not completed, update status
+            if (
+              Math.round(progressPercentage || 0) === 100 &&
+              String(match.status || "").toUpperCase() !== "COMPLETED"
+            ) {
+              try {
+                await patchEnrollmentStatus(
+                  match.id || enrollmentId,
+                  "completed",
+                  token
+                );
+              } catch (err) {
+                console.error(
+                  "Failed to update enrollment status to completed:",
+                  err
+                );
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Failed to refresh enrollment after patch", e);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to mark lesson as read:", err);
+    }
+  };
+
+  // Helper function to detect content type
+  const getContentType = (lesson) => {
+    if (!lesson || !lesson.contentUrl) return null;
+    const url = lesson.contentUrl;
+    const lower = String(url).toLowerCase();
+    if (/\.(mp4|webm|ogg|m3u8|mpd)(\?.*)?$/.test(lower)) return "video";
+    if (/\.pdf(\?.*)?$/.test(lower)) return "pdf";
+    if (/\.(docx?|pptx?|xlsx?)(\?.*)?$/.test(lower)) return "doc";
+    return "other";
   };
 
   // Render lesson content based on its contentUrl or contentText
@@ -596,14 +960,15 @@ const CourseDetail = () => {
               <div className="mt-3 text-right">
                 <Button
                   size="middle"
+                  type="default"
                   onClick={() =>
                     useAiStore
                       .getState()
                       .summarizeCourseAndShow(course.id, course.title)
                   }
-                  className="!bg-white !border !border-gray-200 !rounded-md !text-sm"
+                  className="!bg-blue-50 !border !border-blue-200 !text-blue-700 hover:!bg-blue-100 hover:!border-blue-300 !rounded-md !text-sm !font-medium"
                 >
-                  Summarize This Course
+                  📚 Summarize This Course
                 </Button>
               </div>
             </div>
@@ -620,6 +985,38 @@ const CourseDetail = () => {
               <div className="aspect-video rounded-lg bg-black mb-4 flex items-center justify-center">
                 {renderLessonContent(selectedLesson)}
               </div>
+              {/* Progress bar for video */}
+              {selectedLesson && getContentType(selectedLesson) === "video" && (
+                <div className="mt-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm text-gray-600">
+                      Video Progress
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      {Math.round(videoProgress)}%
+                    </span>
+                  </div>
+                  <Progress percent={Math.round(videoProgress)} />
+                </div>
+              )}
+              {/* Mark as Read button for documents */}
+              {selectedLesson &&
+                (getContentType(selectedLesson) === "pdf" ||
+                  getContentType(selectedLesson) === "doc") && (
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      type="primary"
+                      icon={<CheckCircleOutlined />}
+                      onClick={handleMarkAsRead}
+                      className="bg-blue-600"
+                      disabled={selectedLesson?.completed}
+                    >
+                      {selectedLesson?.completed
+                        ? "Already Read"
+                        : "Mark as Read"}
+                    </Button>
+                  </div>
+                )}
             </Card>
 
             {/* Tabs */}
@@ -662,46 +1059,56 @@ const CourseDetail = () => {
                         )}
                         <List
                           dataSource={section.lessons || []}
-                          renderItem={(lesson, index) => (
-                            <List.Item
-                              className={`cursor-pointer hover:bg-gray-50 px-2 py-3 rounded ${
-                                lesson.locked ? "opacity-50" : ""
-                              }`}
-                              onClick={() => {
-                                if (!lesson.locked) {
-                                  // mark that the user actively clicked a lesson so we trigger a server update
-                                  setHasUserClickedLesson(true);
-                                  setSelectedSectionIndex(sectionIndex);
-                                  setSelectedLessonIndex(index);
-                                }
-                              }}
-                            >
-                              <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center space-x-3">
-                                  {lesson.locked ? (
-                                    <LockOutlined className="text-gray-400" />
-                                  ) : lesson.completed ? (
-                                    <CheckCircleOutlined className="text-green-500" />
-                                  ) : (
-                                    <PlayCircleOutlined className="text-blue-500" />
-                                  )}
-                                  <div>
-                                    <div className="font-medium text-sm">
-                                      {lesson.title}
+                          renderItem={(lesson, index) => {
+                            const isSelected =
+                              selectedSectionIndex === sectionIndex &&
+                              selectedLessonIndex === index;
+                            return (
+                              <List.Item
+                                className={`cursor-pointer hover:bg-gray-50 px-2 py-3 rounded transition-all duration-200 ${
+                                  lesson.locked ? "opacity-50" : ""
+                                } ${
+                                  isSelected
+                                    ? "bg-blue-50 border-l-4 border-blue-600 shadow-sm"
+                                    : ""
+                                }`}
+                                onClick={() => {
+                                  if (!lesson.locked) {
+                                    // mark that the user actively clicked a lesson so we trigger a server update
+                                    setHasUserClickedLesson(true);
+                                    setSelectedSectionIndex(sectionIndex);
+                                    setSelectedLessonIndex(index);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center space-x-3">
+                                    {lesson.locked ? (
+                                      <LockOutlined className="text-gray-400" />
+                                    ) : lesson.completed ? (
+                                      <CheckCircleOutlined className="text-green-500" />
+                                    ) : (
+                                      <PlayCircleOutlined className="text-blue-500" />
+                                    )}
+                                    <div>
+                                      <div className="font-medium text-sm">
+                                        {lesson.title}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {lesson.duration}
+                                      </div>
                                     </div>
-                                    <div className="text-xs text-gray-500">
-                                              {lesson.duration}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </List.Item>
-          )}
-        />
-      </div>
-    ),
-  }))}
-/>
+                                  </div>
+                                </div>
+                              </List.Item>
+                            );
+                          }}
+                        />
+                      </div>
+                    ),
+                  })
+                )}
+              />
             </Card>
           </div>
         </div>

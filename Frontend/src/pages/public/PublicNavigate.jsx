@@ -351,7 +351,7 @@ export const PublicNavigate = ({
             />
             <a
               href="/"
-              className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent"
+              className="text-3xl font-bold bg-gradient-to-r from-sky-600 to-amber-600 bg-clip-text text-transparent"
             >
               Edube
             </a>
@@ -392,13 +392,13 @@ export const PublicNavigate = ({
               Sign In
             </button>
             <button
-              className="bg-gradient-to-r from-sky-600 to-yellow-600 text-white px-8 py-3 rounded-2xl hover:from-sky-700 hover:to-yellow-700 transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              className="bg-gradient-to-r from-sky-600 to-amber-500 text-white px-8 py-3 rounded-2xl hover:from-sky-700 hover:to-amber-600 transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               onClick={() => setShowSignUp(true)}
             >
               Get Started
             </button>
             <button
-              className="border-2 border-sky-600 text-blue-600 px-6 py-2 rounded-2xl hover:bg-sky-50 transition-all font-semibold"
+              className="border-2 border-sky-600 text-sky-600 px-6 py-2 rounded-2xl hover:bg-sky-50 transition-all font-semibold"
               onClick={() => setShowMentorSignUp(true)}
             >
               Be a Mentor now
@@ -483,7 +483,7 @@ export const PublicNavigate = ({
               </Form.Item> */}
                 <a
                   href="/forgot-password"
-                  className="text-blue-600 hover:text-blue-700 text-sm"
+                  className="text-sky-600 hover:text-sky-700 text-sm"
                 >
                   Forgot password?
                 </a>
@@ -498,7 +498,7 @@ export const PublicNavigate = ({
                   loading={loading}
                   onClick={handleLogin}
                   size="large"
-                  className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-blue-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-blue-700 hover:!to-blue-700 !text-white"
+                  className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-sky-700 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-sky-800 !text-white"
                 >
                   Sign in{" "}
                 </Button>
@@ -508,7 +508,7 @@ export const PublicNavigate = ({
                 icon={<FcGoogle size={20} />}
                 block
                 onClick={handleLoginGoogle}
-                className="w-full bg-gray-100 hover:bg-blue-300 flex items-center justify-center"
+                className="w-full bg-gray-100 hover:bg-sky-100 flex items-center justify-center border-gray-200"
               >
                 Google
               </Button>
@@ -522,7 +522,7 @@ export const PublicNavigate = ({
                     setShowSignIn(false);
                     setShowSignUp(true);
                   }}
-                  className="text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-sky-600 hover:text-sky-700 font-medium"
                 >
                   Sign up here
                 </button>
@@ -649,7 +649,7 @@ export const PublicNavigate = ({
                     htmlType="submit"
                     loading={loading}
                     size="large"
-                    className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-yellow-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-yellow-700 !text-white"
+                    className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-amber-500 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-amber-600 !text-white"
                   >
                     Create Account
                   </Button>
@@ -837,7 +837,7 @@ export const PublicNavigate = ({
                     htmlType="submit"
                     loading={loading}
                     size="large"
-                    className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-blue-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-blue-700 !text-white"
+                    className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-sky-700 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-sky-800 !text-white"
                   >
                     Become a Mentor
                   </Button>

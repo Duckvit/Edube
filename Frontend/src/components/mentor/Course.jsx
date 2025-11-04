@@ -135,7 +135,13 @@ export const Course = () => {
       form.resetFields();
 
       // navigate to the course builder route (singular 'course' to match App route)
-      navigate(`/mentor/course/${newCourse.id}/builder`);
+      // navigate to the course builder using route constants to avoid path mismatches
+      navigate(
+        `/${path.PUBLIC_MENTOR}/${path.MENTOR_COURSE_BUILDER.replace(
+          ":courseId",
+          encodeURIComponent(String(newCourse.id))
+        )}`
+      );
     } catch (error) {
       message.error("Failed to create course");
     }
@@ -182,13 +188,8 @@ export const Course = () => {
       title: "Category",
       dataIndex: "category",
       key: "category",
-      render: (text) => (
-        <div>
-          <div className="text-sm uppercase font-medium text-black-600">
-            {Array.isArray(text) ? text.join(", ") || "NULL" : text || "NULL"}
-          </div>
-        </div>
-      ),
+      render: (category) =>
+        Array.isArray(category) ? category.join(", ") : category || "-",
     },
     // {
     //   title: "Content",
@@ -199,30 +200,6 @@ export const Course = () => {
     //       <div className="text-gray-500">{record.videos} videos</div>
     //     </div>
     //   ),
-    // },
-    // {
-    //   title: "Students",
-    //   dataIndex: "students",
-    //   key: "students",
-    //   render: (students) => students?.toLocaleString(),
-    // },
-    {
-      title: "Status",
-      dataIndex: "status",
-      key: "status",
-      render: (status) => {
-        const colors = {
-          active: "green",
-          inactive: "yellow",
-          deleted: "red",
-        };
-        return (
-          <Tag color={colors[status]} className="uppercase">
-            {status}
-          </Tag>
-        );
-      },
-    },
     {
       title: "Actions",
       key: "actions",
@@ -262,24 +239,8 @@ export const Course = () => {
             icon={<DeleteOutlined />}
             className="!bg-red-500 !text-white !w-full"
             onClick={(e) => {
-              // Prevent the row's onClick from firing
               e.stopPropagation();
-              Modal.confirm({
-                title: "Are you sure you want to delete this Course?",
-                okText: "Yes",
-                cancelText: "No",
-                onOk: async () => {
-                  try {
-                    const token = localStorage.getItem("token");
-                    await deleteCourse(token, record.id);
-                    message.success("Course deleted successfully");
-                    await fetchCourses();
-                  } catch (err) {
-                    console.error("Failed to delete course:", err);
-                    message.error("Failed to delete course");
-                  }
-                },
-              });
+              handleDeleteCourse(record.id);
             }}
           >
             Delete
@@ -289,19 +250,48 @@ export const Course = () => {
     },
   ];
 
+  // Helper to delete a course with confirmation
+  const handleDeleteCourse = (id) => {
+    Modal.confirm({
+      title: "Are you sure you want to delete this Course?",
+      okText: "Yes",
+      cancelText: "No",
+      onOk: async () => {
+        try {
+          const token = localStorage.getItem("token");
+          await deleteCourse(token, id);
+          message.success("Course deleted successfully");
+          await fetchCourses();
+        } catch (err) {
+          console.error("Error deleting course:", err);
+          message.error("Failed to delete course");
+        }
+      },
+    });
+  };
+
   const getActionMenu = (record) => ({
     items: [
       {
         key: "edit",
         label: "Edit Content",
         icon: <EditOutlined />,
-        onClick: () => navigate(`/mentor/course/${record.id}/builder`),
+        onClick: () =>
+          navigate(
+            `/${path.PUBLIC_MENTOR}/${path.MENTOR_COURSE_BUILDER.replace(
+              ":courseId",
+              encodeURIComponent(String(record.id))
+            )}`
+          ),
       },
       {
         key: "view",
         label: "View Course",
         icon: <EyeOutlined />,
-        onClick: () => navigate(`/mentor/courses/${record.id}/preview`),
+        onClick: () =>
+          navigate(
+            `/mentor/courses/${encodeURIComponent(String(record.id))}/preview`
+          ),
       },
       {
         type: "divider",
@@ -328,6 +318,7 @@ export const Course = () => {
       const token = localStorage.getItem("token");
       const categoryValue = values.category;
       const payload = {
+        mentor: { id: userData?.mentor?.id },
         title: values.title,
         description: values.description,
         price: Number(values.price) || 0,
@@ -345,14 +336,19 @@ export const Course = () => {
         durationHours: values.durationHours,
       };
 
-      await updateCourse(token, editingCourse.id, payload);
+      const res = await updateCourse(token, editingCourse.id, payload);
+      // Some backends return the updated object, some a status. Show a success message and refresh.
       message.success("Course updated successfully");
       setIsEditModalVisible(false);
       setEditingCourse(null);
       await fetchCourses();
     } catch (err) {
-      console.error("Error updating course:", err);
-      message.error("Failed to update course. Please try again.");
+      console.error("Error updating course:", err, err.response?.data || "");
+      const serverMsg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to update course";
+      message.error(serverMsg);
     }
   };
 
@@ -391,7 +387,13 @@ export const Course = () => {
         dataSource={courses}
         rowKey="id"
         onRow={(record) => ({
-          onClick: () => navigate(`/mentor/course/${record.id}/builder`),
+          onClick: () =>
+            navigate(
+              `/${path.PUBLIC_MENTOR}/${path.MENTOR_COURSE_BUILDER.replace(
+                ":courseId",
+                encodeURIComponent(String(record.id))
+              )}`
+            ),
         })}
         pagination={{
           current: page + 1,

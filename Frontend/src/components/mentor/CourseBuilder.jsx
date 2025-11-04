@@ -2,7 +2,10 @@ import React, { useState, useEffect } from "react";
 import {
   getSectionByCourseId,
   createSection,
+  updateSection,
+  deleteSection,
 } from "../../apis/SectionServices";
+import { getLessonsBySectionId } from "../../apis/LessonServices";
 import { getCourseById, deleteCourse } from "../../apis/CourseServices";
 import { useUserStore } from "../../store/useUserStore";
 import { toast } from "react-toastify";
@@ -29,14 +32,28 @@ import {
   ArrowLeftOutlined,
   FileTextOutlined,
 } from "@ant-design/icons";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import path from "../../utils/path";
 
 const { Panel } = Collapse;
 const { TextArea } = Input;
 
 const CourseBuilder = () => {
   const navigate = useNavigate();
-  const { courseId } = useParams();
+  const { courseId: paramCourseId } = useParams();
+  const location = useLocation();
+  // fallback: if route param missing, extract courseId from pathname
+  const courseId =
+    paramCourseId ||
+    (() => {
+      try {
+        // capture any segment between 'course/' and '/builder' (allow dashes, dots, etc.)
+        const m = location.pathname.match(/course\/([^/]+)\/builder/);
+        return m ? m[1] : null;
+      } catch (e) {
+        return null;
+      }
+    })();
   const [sectionForm] = Form.useForm();
   const [videoForm] = Form.useForm();
   const [course, setCourse] = useState({});
@@ -136,35 +153,35 @@ const CourseBuilder = () => {
       const token = localStorage.getItem("token");
       const values = await sectionForm.validateFields();
 
-      // Đảm bảo courseId là số nếu có thể
-      const courseIdNum = courseId ? Number(courseId) : null;
-      console.log(
-        "🔵 Creating section for courseId:",
-        courseId,
-        "as number:",
-        courseIdNum
-      );
-
-      if (!courseId || isNaN(courseIdNum)) {
-        toast.error("Invalid course ID. Please refresh the page.");
-        return;
-      }
-
-      const data = { course: { id: courseIdNum }, ...values };
-      console.log("📤 Creating section with data:", data);
-      const res = await createSection(data, token);
-      console.log("📥 Create section response:", res);
-
-      if ((res.statusCode === 200 || res.statusCode === 201) && res.section) {
-        toast.success("Section created successfully!");
-        setSections((prev) => [...prev, { ...res.section, videos: [] }]);
-        sectionForm.resetFields();
-        setIsSectionModalVisible(false);
+      if (editingSection && editingSection.id) {
+        // Update existing section via API
+        const payload = {
+          id: editingSection.id,
+          title: values.title,
+          description: values.description || "",
+          orderIndex: editingSection.orderIndex || 1,
+        };
+        await updateSection(payload, token);
+        toast.success("Section updated successfully!");
       } else {
-        throw new Error(res.message || "Failed to create section");
+        // Create new section
+        const orderIndex = (sections?.length || 0) + 1;
+        const data = {
+          course: { id: Number(courseId) },
+          orderIndex,
+          ...values,
+        };
+        await createSection(data, token);
+        toast.success("Section created successfully!");
       }
+
+      // refresh sections from server to reflect persisted state
+      await fetchSections();
+      sectionForm.resetFields();
+      setIsSectionModalVisible(false);
+      setEditingSection(null);
     } catch (err) {
-      toast.error("Failed to create section!");
+      toast.error("Failed to save section!");
       console.error("❌ Error:", err);
     }
   };
@@ -195,13 +212,27 @@ const CourseBuilder = () => {
   const handleDeleteSection = (sectionId) => {
     Modal.confirm({
       title: "Delete Section",
-      content:
-        "Are you sure you want to delete this section and all its videos?",
-      okText: "Delete",
+      content: "Are you sure you want to delete this section?",
+      okText: "Yes",
+      cancelText: "No",
       okType: "danger",
-      onOk: () => {
-        setSections(sections.filter((s) => s.id !== sectionId));
-        message.success("Section deleted successfully");
+      onOk: async () => {
+        try {
+          const token = localStorage.getItem("token");
+          // If local temporary id, just remove locally
+          if (String(sectionId).startsWith("section-")) {
+            setSections(sections.filter((s) => s.id !== sectionId));
+            message.success("Section deleted successfully");
+            return;
+          }
+          await deleteSection(sectionId, token);
+          // re-fetch sections from server
+          await fetchSections();
+          message.success("Section deleted successfully");
+        } catch (err) {
+          console.error("Failed to delete section:", err);
+          message.error("Failed to delete section");
+        }
       },
     });
   };
@@ -211,7 +242,22 @@ const CourseBuilder = () => {
     setEditingVideo(null);
     // videoForm.resetFields();
     // setIsVideoModalVisible(true);
-    navigate(`upload-lesson/${sectionId}`);
+    // navigate to the upload lesson route using absolute path constants
+    try {
+      const target = `/${
+        path.PUBLIC_MENTOR
+      }/${path.MENTOR_COURSE_BUILDER.replace(
+        ":courseId",
+        encodeURIComponent(String(courseId))
+      )}/${path.MENTOR_UPLOAD_LESSON.replace(
+        ":sectionId",
+        encodeURIComponent(String(sectionId))
+      )}`;
+      navigate(target);
+    } catch (err) {
+      // fallback to relative
+      navigate(`upload-lesson/${sectionId}`);
+    }
   };
 
   const handleEditVideo = (sectionId, video) => {
@@ -223,38 +269,71 @@ const CourseBuilder = () => {
 
   const handleSaveVideo = async (values) => {
     try {
-      setSections(
-        sections.map((section) => {
-          if (section.id === currentSectionId) {
-            if (editingVideo) {
-              return {
-                ...section,
-                videos: section.videos?.map((v) =>
-                  v.id === editingVideo.id ? { ...v, ...values } : v
-                ),
-              };
-            } else {
-              const newVideo = {
-                id: `video-${Date.now()}`,
-                ...values,
-                orderIndex: section.videos.length + 1,
-              };
-              return {
-                ...section,
-                videos: [...section.videos, newVideo],
-              };
-            }
-          }
-          return section;
-        })
-      );
-      message.success(
-        editingVideo ? "Video updated successfully" : "Video added successfully"
-      );
+      const token = localStorage.getItem("token");
+
+      // map incoming form values to API shape
+      const payload = {
+        section: { id: currentSectionId },
+        title: values.title,
+        description: values.description,
+        contentType:
+          values.contentType || (values.videoUrl ? "video" : "document"),
+        contentText: values.videoUrl || values.contentText || null,
+        orderIndex: 1,
+        durationMinutes: values.duration
+          ? Math.ceil(values.duration / 60)
+          : undefined,
+      };
+
+      // determine orderIndex from existing lessons
+      const targetSection = sections.find((s) => s.id === currentSectionId) || {
+        lessons: [],
+      };
+      payload.orderIndex = editingVideo
+        ? editingVideo.orderIndex || editingVideo.orderIndex === 0
+          ? editingVideo.orderIndex
+          : 1
+        : (targetSection.lessons?.length || 0) + 1;
+
+      if (
+        editingVideo &&
+        editingVideo.id &&
+        !String(editingVideo.id).startsWith("video-")
+      ) {
+        // persisted: call update API
+        const updated = await updateLesson(editingVideo.id, payload, token);
+        setSections(
+          sections.map((section) =>
+            section.id === currentSectionId
+              ? {
+                  ...section,
+                  lessons:
+                    section.lessons?.map((l) =>
+                      l.id === updated.id ? updated : l
+                    ) || [],
+                }
+              : section
+          )
+        );
+        message.success("Lesson updated successfully");
+      } else {
+        // create new lesson via API
+        const created = await createLesson(payload, token);
+        setSections(
+          sections.map((section) =>
+            section.id === currentSectionId
+              ? { ...section, lessons: [...(section.lessons || []), created] }
+              : section
+          )
+        );
+        message.success("Lesson added successfully");
+      }
+
       setIsVideoModalVisible(false);
       videoForm.resetFields();
     } catch (error) {
       message.error("Failed to save video");
+      console.error("❌ handleSaveVideo error:", error);
     }
   };
 
@@ -265,17 +344,42 @@ const CourseBuilder = () => {
       okText: "Delete",
       okType: "danger",
       onOk: () => {
-        setSections(
-          sections.map((section) =>
-            section.id === sectionId
-              ? {
-                  ...section,
-                  videos: section.videos.filter((v) => v.id !== videoId),
-                }
-              : section
-          )
-        );
-        message.success("Video deleted successfully");
+        const token = localStorage.getItem("token");
+        // if persisted id, call API; else just remove local
+        if (!String(videoId).startsWith("video-")) {
+          deleteLesson(videoId, token)
+            .then(() => {
+              setSections(
+                sections.map((section) =>
+                  section.id === sectionId
+                    ? {
+                        ...section,
+                        lessons: section.lessons.filter(
+                          (v) => v.id !== videoId
+                        ),
+                      }
+                    : section
+                )
+              );
+              message.success("Lesson deleted successfully");
+            })
+            .catch((err) => {
+              console.error("Failed to delete lesson:", err);
+              message.error("Failed to delete lesson");
+            });
+        } else {
+          setSections(
+            sections.map((section) =>
+              section.id === sectionId
+                ? {
+                    ...section,
+                    lessons: section.lessons.filter((v) => v.id !== videoId),
+                  }
+                : section
+            )
+          );
+          message.success("Lesson deleted successfully");
+        }
       },
     });
   };

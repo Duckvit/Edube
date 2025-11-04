@@ -33,7 +33,7 @@ export const createCourse = async (token, data) => {
   const res = await axiosConfig.post(`/api/courses`, data, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  return res;
+  return res.data;
 };
 
 export const updateCourse = async (token, id, data) => {

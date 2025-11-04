@@ -1,13 +1,11 @@
 import axiosConfig from "../axiosConfig";
 
-const authHeaders = (token, extra = {}) => ({
-  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  ...extra,
-});
-
-export const uploadLesson = (formData, token, config = {}) => {
-  const headers = authHeaders(token, { ...(config.headers || {}) });
-  return axiosConfig.post("/api/mentor/lesson/upload", formData, {
+export const uploadLesson = (data, token, config = {}) => {
+  const headers = { ...(config.headers || {}) };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return axiosConfig.post("/api/lessons/upload", data, {
     ...config,
     headers,
   });

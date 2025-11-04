@@ -5,10 +5,16 @@ import { UserRegister, UserLogin, getProfile } from "../../apis/UserServices";
 import { createMentor } from "../../apis/MentorServices";
 import { createLearner } from "../../apis/LearnerServices";
 import { Modal, Form, Input, Button, Divider } from "antd";
-import { MailOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
+import {
+  MailOutlined,
+  LockOutlined,
+  UserOutlined,
+  TrophyOutlined,
+} from "@ant-design/icons";
 import { roleForComponent } from "../../utils/constant";
 import { useUserStore } from "../../store/useUserStore";
 import icons from "../../utils/icon";
+import TextArea from "antd/es/input/TextArea";
 
 export const PublicNavigate = ({
   openSignIn,
@@ -115,27 +121,197 @@ export const PublicNavigate = ({
   const handleMentorRegister = async (values) => {
     setLoading(true);
     try {
-      const mentorValues = { ...values, role: "mentor" };
-      const response = await UserRegister(mentorValues);
-      setLoading(false);
+      console.log("🚀 Starting mentor registration...");
 
-      if (response && response.status === 200) {
-        toast.success("Mentor Registration Successful");
-        setShowMentorSignUp(false);
-        switchToSignIn();
-      } else if (response?.status === 400) {
-        toast.error(
-          response.data.message || "Registration failed, please try again."
+      const userPayload = {
+        username: values.username,
+        email: values.email,
+        password: values.password,
+        fullName: values.fullName,
+      };
+
+      console.log("📝 Step 1: Creating user...", userPayload);
+      const userResponse = await UserRegister(userPayload);
+      console.log("✅ User response:", userResponse);
+
+      // Check both HTTP status and backend statusCode
+      const userHttpStatus = userResponse?.status;
+      const userBackendStatus = userResponse?.data?.statusCode;
+      const isUserSuccess =
+        userHttpStatus === 200 ||
+        userHttpStatus === 201 ||
+        userBackendStatus === 200 ||
+        userBackendStatus === 201;
+
+      if (isUserSuccess) {
+        const createdUser = userResponse.data?.user || userResponse.data;
+        console.log("✅ User created successfully:", createdUser);
+
+        if (!createdUser?.id) {
+          console.error("❌ User ID not found in response:", createdUser);
+          toast.error("❌ Failed to get user ID. Please try again.");
+          setLoading(false);
+          return;
+        }
+
+        // Step 2: Auto-login to get token for creating mentor profile
+        console.log("📝 Step 2: Auto-login to get token...");
+        const loginPayload = {
+          username: values.username,
+          password: values.password,
+        };
+
+        let loginToken = null;
+        let loginResponse = null;
+        let userRole = "MENTOR";
+
+        try {
+          loginResponse = await UserLogin(loginPayload);
+          console.log("✅ Login response:", loginResponse);
+
+          if (loginResponse?.data?.token) {
+            loginToken = loginResponse.data.token;
+            userRole = loginResponse.data?.role || "MENTOR";
+            console.log("✅ Token obtained:", loginToken);
+            console.log("✅ User role:", userRole);
+
+            // Save token to localStorage so axios interceptor can use it
+            localStorage.setItem("token", loginToken);
+            console.log("✅ Token saved to localStorage");
+          } else {
+            console.error("❌ No token in login response:", loginResponse);
+            toast.error(
+              "⚠️ User created but login failed. Please login manually."
+            );
+            setShowMentorSignUp(false);
+            switchToSignIn();
+            setLoading(false);
+            return;
+          }
+        } catch (loginError) {
+          console.error("❌ Login error:", loginError);
+          toast.error(
+            "⚠️ User created but auto-login failed. Please login manually to complete mentor registration."
+          );
+          setShowMentorSignUp(false);
+          switchToSignIn();
+          setLoading(false);
+          return;
+        }
+
+        // Step 3: Create mentor profile with token
+        // Token is automatically added by axiosConfig interceptor from localStorage
+        const mentorPayload = {
+          user: { id: createdUser.id },
+          bio: values.bio,
+          expertiseAreas: values.expertiseAreas,
+          qualification: values.qualification,
+        };
+
+        console.log("📝 Step 3: Creating mentor profile...");
+        console.log("📝 Request body:", JSON.stringify(mentorPayload, null, 2));
+        console.log(
+          "📝 Token in localStorage:",
+          localStorage.getItem("token") ? "Present" : "Missing"
         );
+        const token = localStorage.getItem("token");
+        console.log("🔑 Token being sent:", token);
+
+        const mentorResponse = await createMentor(mentorPayload, token);
+        console.log("🔑 Header token check:", token);
+
+        console.log("✅ Mentor response:", mentorResponse);
+
+        // Check both HTTP status and backend statusCode
+        // createMentor now returns res (not res.data), so check both status and data.statusCode
+        const mentorHttpStatus = mentorResponse?.status;
+        const mentorBackendStatus = mentorResponse?.data?.statusCode;
+        const isMentorSuccess =
+          mentorHttpStatus === 200 ||
+          mentorHttpStatus === 201 ||
+          mentorBackendStatus === 200 ||
+          mentorBackendStatus === 201;
+
+        if (isMentorSuccess) {
+          console.log("🎉 Mentor registration completed successfully!");
+
+          // Set user data and role in store
+          const { setModal, setUserData } = useUserStore.getState();
+          setModal(loginToken, userRole, true);
+
+          // Get profile to save user data
+          try {
+            const profileRes = await getProfile(values.username, loginToken);
+            if (profileRes?.user) {
+              setUserData(profileRes.user);
+              console.log("✅ User profile loaded:", profileRes.user);
+            }
+          } catch (profileError) {
+            console.warn("⚠️ Could not load user profile:", profileError);
+          }
+
+          toast.success("🎉 Mentor registration successful!");
+
+          // Navigate to mentor dashboard
+          const dashboardPath = roleForComponent[userRole];
+          if (userRole && dashboardPath) {
+            setTimeout(() => {
+              setShowMentorSignUp(false);
+              navigate("/" + dashboardPath);
+            }, 1000);
+          } else {
+            setTimeout(() => {
+              setShowMentorSignUp(false);
+              switchToSignIn();
+            }, 1000);
+          }
+        } else {
+          console.error("❌ Mentor creation failed:", {
+            httpStatus: mentorHttpStatus,
+            backendStatus: mentorBackendStatus,
+            message: mentorResponse?.data?.message,
+            fullResponse: mentorResponse,
+          });
+          toast.error(
+            mentorResponse?.data?.message ||
+              "❌ Failed to create mentor profile. Please check console for details."
+          );
+          // Clear token if mentor creation failed
+          localStorage.removeItem("token");
+        }
       } else {
-        toast.error("Unexpected error occurred, please try again.");
+        console.error("❌ User creation failed:", {
+          httpStatus: userHttpStatus,
+          backendStatus: userBackendStatus,
+          message: userResponse?.data?.message,
+          fullResponse: userResponse,
+        });
+        toast.error(
+          userResponse?.data?.message ||
+            "❌ Failed to create user. Please try again."
+        );
       }
     } catch (error) {
+      console.error("❌ Error in mentor register:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        response: error?.response,
+        data: error?.response?.data,
+        status: error?.response?.status,
+      });
+
+      // Clear token on error
+      localStorage.removeItem("token");
+
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "⚠️ Registration failed. Please check your network and try again.";
+
+      toast.error(errorMessage);
+    } finally {
       setLoading(false);
-      console.log("Error mentor register: ", error);
-      toast.error(
-        "An error occurred during registration. Please check your network."
-      );
+      console.log("🏁 Mentor registration process finished");
     }
   };
 
@@ -600,6 +776,57 @@ export const PublicNavigate = ({
                     id="mentor-confirm-password"
                     prefix={<LockOutlined className="text-gray-400" />}
                     placeholder="Confirm your password"
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Bio"
+                  name="bio"
+                  rules={[
+                    { required: true, message: "Please enter your bio" },
+                    // { min: 50, message: "Bio must be at least 50 characters" },
+                  ]}
+                >
+                  <TextArea
+                    rows={4}
+                    placeholder="Tell us about yourself and your passion for teaching..."
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Expertise Areas"
+                  name="expertiseAreas"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please enter your expertise areas",
+                    },
+                    // { min: 10, message: "Expertise areas must be at least 10 characters" },
+                  ]}
+                >
+                  <TextArea
+                    rows={3}
+                    placeholder="e.g., C++, Java, Data Structure & Algorithm, Web Development..."
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Qualifications"
+                  name="qualification"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please enter your qualifications",
+                    },
+                    // { min: 10, message: "Qualifications must be at least 10 characters" },
+                  ]}
+                >
+                  <Input
+                    prefix={<TrophyOutlined className="text-gray-400" />}
+                    placeholder="e.g., Top 10 Students in the class, 5 years experience..."
                     className="rounded-xl"
                   />
                 </Form.Item>

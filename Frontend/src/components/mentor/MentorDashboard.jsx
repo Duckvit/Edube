@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Loading from "../common/Loading";
-import { statsData, activitiesData, conversations } from "../../utils/mockData";
+import { statsData, activitiesData } from "../../utils/mockData";
 import { BookOpen, Users, TrendingUp, Star } from "lucide-react";
 import { getAllActiveCoursesByMentorId } from "../../apis/CourseServices";
+import { getConversations, getMessages } from "../../apis/ChatServices";
 import { useUserStore } from "../../store/useUserStore";
 import { toast } from "react-toastify";
+import { parseJwt } from "../../utils/jwt";
+import { path } from "../../utils/path";
 
 export const Dashboard = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
   const [courses, setCourses] = useState([]);
@@ -14,28 +19,139 @@ export const Dashboard = () => {
   const [totalActiveCourses, setTotalActiveCourses] = useState(0);
   const [totalLearners, setTotalLearners] = useState(0);
   const [error, setError] = useState(null);
-  const { userData, token } = useUserStore();
+  const [recentMessages, setRecentMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const { userData, token, role } = useUserStore();
 
-  // useEffect(() => {
-  //   // giả lập fetch API
-  //   setTimeout(() => {
-  //     setStats(statsData);
-  //     setActivities(activitiesData);
+  // Helper: Get current user ID
+  const getCurrentUserId = () => {
+    const jwtToken = localStorage.getItem("token");
+    if (userData?.id) return Number(userData.id);
+    if (userData?.mentor?.id) return Number(userData.mentor.id);
+    if (userData?.learner?.id) return Number(userData.learner.id);
+    if (jwtToken) {
+      try {
+        const decoded = parseJwt(jwtToken);
+        if (decoded?.userId) return Number(decoded.userId);
+      } catch (e) {
+        console.warn("Failed to parse JWT:", e);
+      }
+    }
+    return null;
+  };
 
-  //     // Lấy tin nhắn mới nhất từ mỗi conversation
-  //     const latestMessages = conversations.map((c) => {
-  //       const lastMessage = c.messages[c.messages.length - 1];
-  //       return {
-  //         name: c.name,
-  //         text: lastMessage.text,
-  //         time: lastMessage.time,
-  //         isRead: lastMessage.isRead,
-  //       };
-  //     });
+  // Helper: Fetch latest message for a conversation
+  const fetchLatestMessage = async (conversationId) => {
+    try {
+      const jwtToken = localStorage.getItem("token");
+      if (!jwtToken || !conversationId) return null;
+      const response = await getMessages(conversationId, 0, 1);
+      const messagesList = response?.chatMessages || [];
+      
+      if (response?.statusCode === 204 || messagesList.length === 0) {
+        return null;
+      }
+      
+      // Return the first (latest) message
+      return messagesList[0];
+    } catch (error) {
+      console.error(`Error fetching latest message for conversation ${conversationId}:`, error);
+      return null;
+    }
+  };
 
-  //     setMessages(latestMessages);
-  //   }, 500);
-  // }, []);
+  // Load recent messages
+  const loadRecentMessages = async () => {
+    try {
+      setLoadingMessages(true);
+      const jwtToken = localStorage.getItem("token");
+      if (!jwtToken) {
+        setRecentMessages([]);
+        return;
+      }
+
+      const userId = getCurrentUserId();
+      if (!userId) {
+        setRecentMessages([]);
+        return;
+      }
+
+      const response = await getConversations(userId, 0, 10);
+      const conversationsList = response?.chatConversations || [];
+
+      if (response?.statusCode === 204 || conversationsList.length === 0) {
+        setRecentMessages([]);
+        return;
+      }
+
+      // Fetch latest message for each conversation
+      const messagesWithLatest = await Promise.all(
+        conversationsList.map(async (conv) => {
+          const latestMessage = await fetchLatestMessage(conv.id);
+          if (!latestMessage) return null;
+
+          // Get other participant name
+          const currentUserId = getCurrentUserId();
+          const otherParticipant =
+            conv.mentor?.user?.id === currentUserId
+              ? conv.learner
+              : conv.learner?.user?.id === currentUserId
+              ? conv.mentor
+              : role?.toLowerCase() === "learner"
+              ? conv.mentor
+              : conv.learner;
+
+          const otherName =
+            otherParticipant?.user?.fullName ||
+            otherParticipant?.fullName ||
+            otherParticipant?.user?.username ||
+            otherParticipant?.username ||
+            "Unknown User";
+
+          // Determine if message is from current user
+          const isFromCurrentUser = 
+            latestMessage.senderId === currentUserId ||
+            latestMessage.senderId === userData?.mentor?.id ||
+            latestMessage.senderId === userData?.learner?.id;
+
+          return {
+            conversationId: conv.id,
+            sender: isFromCurrentUser ? "You" : otherName,
+            senderId: latestMessage.senderId,
+            text: latestMessage.message || "",
+            time: latestMessage.createdAt
+              ? new Date(latestMessage.createdAt).toLocaleTimeString()
+              : new Date().toLocaleTimeString(),
+            createdAt: latestMessage.createdAt,
+            isRead: latestMessage.isRead !== false,
+          };
+        })
+      );
+
+      // Filter out null values and sort by createdAt (newest first)
+      const validMessages = messagesWithLatest
+        .filter((msg) => msg !== null)
+        .sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt) : new Date(0);
+          const bTime = b.createdAt ? new Date(b.createdAt) : new Date(0);
+          return bTime - aTime; // Descending order (newest first)
+        })
+        .slice(0, 5); // Limit to 5 most recent messages
+
+      setRecentMessages(validMessages);
+    } catch (error) {
+      console.error("Error loading recent messages:", error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast.error("Authentication failed. Please login again.");
+        localStorage.removeItem("token");
+      } else {
+        console.log(error.response?.data?.message || "Failed to load recent messages");
+      }
+      setRecentMessages([]);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
 
   useEffect(() => {
     const fetchAllActiveCourse = async () => {
@@ -68,6 +184,14 @@ export const Dashboard = () => {
     };
 
     fetchAllActiveCourse();
+  }, [userData]);
+
+  // Load recent messages
+  useEffect(() => {
+    if (userData) {
+      const timer = setTimeout(() => loadRecentMessages(), 200);
+      return () => clearTimeout(timer);
+    }
   }, [userData]);
 
   return (
@@ -199,24 +323,37 @@ export const Dashboard = () => {
             Recent Messages
           </h3>
           <div className="space-y-4 max-h-100 overflow-y-auto">
-            {conversations.map((conv) =>
-              conv.messages.map((msg, index) => (
+            {loadingMessages ? (
+              <div className="p-4 text-center text-gray-500">
+                <p>Loading messages...</p>
+              </div>
+            ) : recentMessages.length > 0 ? (
+              recentMessages.map((msg, index) => (
                 <div
-                  key={`${conv.id}-${msg.id || index}`}
-                  className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg"
+                  key={`${msg.conversationId}-${msg.createdAt || index}`}
+                  onClick={() => {
+                    navigate(`/${path.PUBLIC_MENTOR}/${path.USER_CHAT}`, {
+                      state: { conversationId: msg.conversationId },
+                    });
+                  }}
+                  className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
                 >
                   <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                    {msg.sender.charAt(0)}
+                    {msg.sender?.charAt(0) || "?"}
                   </div>
                   <div className="flex-1">
                     <p className="font-medium text-gray-900 text-sm">
-                      {msg.sender}
+                      {msg.sender || "Unknown"}
                     </p>
-                    <p className="text-sm text-gray-600 truncate">{msg.text}</p>
+                    <p className="text-sm text-gray-600 truncate">{msg.text || "No message"}</p>
                     <p className="text-xs text-gray-500 mt-1">{msg.time}</p>
                   </div>
                 </div>
               ))
+            ) : (
+              <div className="p-4 text-center text-gray-500">
+                <p>No recent messages</p>
+              </div>
             )}
           </div>
         </div>

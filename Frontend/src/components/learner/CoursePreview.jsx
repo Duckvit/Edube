@@ -4,8 +4,9 @@ import { Card, Button, Rate, Collapse, List, Modal } from "antd";
 import { createPayment } from "../../apis/PaymentServices";
 import {
   createEnrollment,
-  getFreeEnrollments,
+  createFreeEnrollments,
 } from "../../apis/EnrollmentServices";
+import { createConversation } from "../../apis/ChatServices";
 import { toast } from "react-toastify";
 import {
   PlayCircleOutlined,
@@ -24,6 +25,7 @@ const CoursePreview = () => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { userData } = useUserStore();
   const [selectedLesson, setSelectedLesson] = useState(null);
 
   // ✅ Fetch dữ liệu thật từ API
@@ -46,6 +48,7 @@ const CoursePreview = () => {
           id: c.id || c.courseId || c._id || id,
           title: c.title || c.name || "Untitled Course",
           mentor: c.mentor?.user?.fullName || "Unknown",
+          mentorId: c.mentor?.id || null,
           category: c.category || "General",
           level: c.level || "All",
           rating: c.rating || 5,
@@ -81,53 +84,50 @@ const CoursePreview = () => {
         return;
       }
 
-      // if course is free (price 0), create enrollment directly
       if (!course) {
         toast.error("Course data not loaded");
         return;
       }
 
       const priceNum = Number(course.price || 0);
-      if (priceNum === 0) {
-        // create enrollment directly
-        const learnerId =
-          useUserStore.getState().userData?.id ||
-          Number(localStorage.getItem("learnerId")) ||
-          1;
-        const payload = {
-          learner: { id: learnerId },
-          course: { id: courseId },
-          amountPaid: 0.0,
-          status: "active",
-          progressPercentage: 0.0,
-        };
+      const payload = { courseId };
 
-        const res = await createEnrollment(payload, token);
-        if (res?.id) {
-          toast.success("Enrolled successfully. Redirecting to course...");
-          navigate(`/learner/course-detail/${courseId}`);
-        } else {
-          console.error("Enrollment API returned unexpected response", res);
-          toast.error("Failed to enroll");
+      // ✅ Trường hợp khóa học miễn phí
+      if (priceNum === 0) {
+        const res = await createFreeEnrollments(token, payload); // GỌI API FREE
+        console.log("✅ Free Enrollment Response:", res);
+
+        toast.success("Enrolled successfully. Redirecting to course...");
+
+        // Tạo hội thoại với mentor
+        if (course.mentorId) {
+          try {
+            const userId =
+              useUserStore.getState().userData?.learner?.id ||
+              Number(localStorage.getItem("userId")) ||
+              1;
+            await createConversation({
+              learner: { id: userId },
+              mentor: { id: course.mentorId },
+              course: { id: courseId },
+            });
+            console.log("✅ Conversation created with mentor");
+          } catch (err) {
+            console.warn("⚠️ Failed to create conversation:", err);
+          }
         }
+
+        navigate(`/learner/course-detail/${courseId}`);
         return;
       }
 
-      const payload = { courseId };
-
-      // Kiểm tra free course
-      if (course?.price === 0 || !course?.price) {
-        await getFreeEnrollments(token, payload);
-        toast.success("Enrolled successfully. Redirecting to course...");
-        navigate(`/learner/course-detail/${courseId}`);
+      // 💳 Nếu không phải free course → Thanh toán
+      const res = await createPayment(payload, token);
+      if (res?.checkoutUrl) {
+        toast.success("Redirecting to payment...");
+        window.location.replace(res.checkoutUrl);
       } else {
-        const res = await createPayment(payload, token);
-        if (res?.checkoutUrl) {
-          toast.success("Redirecting to payment...");
-          window.location.replace(res.checkoutUrl);
-        } else {
-          toast.error("Failed to create payment link");
-        }
+        toast.error("Failed to create payment link");
       }
     } catch (error) {
       console.error(error);

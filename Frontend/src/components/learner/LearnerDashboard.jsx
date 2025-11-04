@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 // import { enrolledCourses, allCourses } from "../../utils/mockData";
 import { getAllCourses } from "../../apis/CourseServices";
 import { createPayment } from "../../apis/PaymentServices";
-import { getEnrollmentsByLearner } from "../../apis/EnrollmentServices";
+import { getEnrollmentsByLearner, createFreeEnrollments } from "../../apis/EnrollmentServices";
 import { toast } from "react-toastify";
 import {
   Card,
@@ -88,8 +88,8 @@ export const LearnerDashboard = () => {
     const fetchEnrollCourses = async () => {
       try {
         const token = localStorage.getItem("token");
-        const learnerId =
-          userData?.id || useUserStore.getState().userData?.id || 1;
+        const learnerId = userData?.learner.id;
+        console.log("userData", userData)
         if (!token || !learnerId) {
           setError("Thiếu token hoặc learnerId");
           return;

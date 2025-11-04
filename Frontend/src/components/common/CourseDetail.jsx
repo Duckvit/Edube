@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { courseData } from "../../utils/mockData";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -64,11 +63,10 @@ const CourseDetail = () => {
         const mapped = {
           id: c.id || c.courseId || c._id || courseId,
           title: c.title || c.name || "Untitled Course",
-          instructor:
-            c.instructor || c.author || c.mentor?.user?.fullName || "Unknown",
+          instructor: c.instructor || c.mentor?.user?.fullName || "Unknown",
           description: c.description || c.summary || c.overview || "",
           rating: c.rating || 5,
-          students: c.totalStudents ?? c.students ?? c.enrolledCount ?? 0,
+          students: c.totalStudents ?? 0,
           duration:
             c.duration ||
             (c.durationHours
@@ -692,19 +690,18 @@ const CourseDetail = () => {
                                       {lesson.title}
                                     </div>
                                     <div className="text-xs text-gray-500">
-                                      {lesson.duration}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </List.Item>
-                          )}
-                        />
-                      </div>
-                    ),
-                  })
-                )}
-              />
+                                              {lesson.duration}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </List.Item>
+          )}
+        />
+      </div>
+    ),
+  }))}
+/>
             </Card>
           </div>
         </div>

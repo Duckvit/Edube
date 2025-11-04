@@ -20,6 +20,7 @@ export const useUserStore = create((set) => ({
       token,
       role,
       isLoggedIn,
+      userData: null, // Reset userData when setting new login session
     }));
   },
 

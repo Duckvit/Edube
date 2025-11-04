@@ -7,13 +7,6 @@ import {
 } from "../../apis/SectionServices";
 import { getLessonsBySectionId } from "../../apis/LessonServices";
 import { getCourseById, deleteCourse } from "../../apis/CourseServices";
-import {
-  uploadLesson,
-  createLesson,
-  getLessonById,
-  updateLesson,
-  deleteLesson,
-} from "../../apis/LessonServices";
 import { useUserStore } from "../../store/useUserStore";
 import { toast } from "react-toastify";
 import {
@@ -36,11 +29,8 @@ import {
   DeleteOutlined,
   PlayCircleOutlined,
   FileOutlined,
-  SaveOutlined,
-  EyeOutlined,
   ArrowLeftOutlined,
-  UploadOutlined,
-  DragOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import path from "../../utils/path";
@@ -76,57 +66,40 @@ const CourseBuilder = () => {
   const userData = useUserStore((s) => s.userData);
   const firstSection = course.curriculum?.[0];
 
-  // fetch sections helper (re-usable)
-  const fetchSections = async () => {
-    const token = localStorage.getItem("token");
-    try {
-      const data = await getSectionByCourseId(courseId, token);
-      const rawSections = data?.sections || data || [];
-      // normalize: ensure each section has a lessons array
-      const normalized = rawSections.map((s) => ({
-        ...s,
-        lessons: s.lessons || s.videos || [],
-      }));
-
-      // For any section with no lessons array or empty lessons, try fetching lessons by section id
-      const needFetch = normalized.filter(
-        (s) => !(s.lessons && s.lessons.length > 0)
-      );
-      if (needFetch.length > 0) {
-        try {
-          const promises = needFetch.map((s) =>
-            getLessonsBySectionId(s.id, token).then((res) => ({
-              id: s.id,
-              lessons: res?.lessons || res || [],
-            }))
-          );
-          const results = await Promise.all(promises);
-          const lessonsMap = results.reduce(
-            (acc, r) => ({ ...acc, [r.id]: r.lessons }),
-            {}
-          );
-          const withLessons = normalized.map((s) => ({
-            ...s,
-            lessons:
-              s.lessons && s.lessons.length > 0
-                ? s.lessons
-                : lessonsMap[s.id] || [],
-          }));
-          setSections(withLessons);
-        } catch (innerErr) {
-          console.warn("Could not fetch lessons per section:", innerErr);
-          setSections(normalized);
-        }
-      } else {
-        setSections(normalized);
-      }
-    } catch (err) {
-      console.error("❌ Error fetching sections:", err);
-      toast.error("Failed to load sections");
-    }
-  };
-
   useEffect(() => {
+    const fetchSections = async () => {
+      if (!courseId) {
+        console.warn("⚠️ courseId is missing in fetchSections");
+        setSections([]);
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem("token");
+        console.log(
+          "🔵 Fetching sections for courseId:",
+          courseId,
+          "type:",
+          typeof courseId
+        );
+        const data = await getSectionByCourseId(courseId, token);
+        console.log("📥 Sections response:", data);
+
+        // Lấy đúng mảng sections ra
+        const sectionsArray = data?.sections || data || [];
+        console.log("📋 Sections array:", sectionsArray);
+        setSections(Array.isArray(sectionsArray) ? sectionsArray : []);
+
+        // Nếu muốn lấy course title riêng
+        if (sectionsArray.length > 0 && sectionsArray[0]?.course) {
+          setCourse(sectionsArray[0].course);
+        }
+      } catch (error) {
+        console.error("❌ Error fetching sections:", error);
+        console.error("Error details:", error.response || error);
+        setSections([]); // tránh lỗi reduce khi API fail
+      }
+    };
     fetchSections();
   }, [courseId]);
 
@@ -174,51 +147,6 @@ const CourseBuilder = () => {
       mounted = false;
     };
   }, [courseId, userData]);
-
-  const handleUpload = async () => {
-    const token = localStorage.getItem("token");
-
-    // Tạo FormData according to backend contract: 'lesson' (JSON) + file(s)
-    try {
-      const lessonObj = {
-        section: { id: currentSectionId || sectionId || courseId },
-        title: videoForm.getFieldValue("title") || "",
-        description: videoForm.getFieldValue("description") || "",
-        contentType: videoForm.getFieldValue("contentType") || "document",
-      };
-
-      const formData = new FormData();
-      formData.append("lesson", JSON.stringify(lessonObj));
-
-      // attach files from an Upload component or `file` variable if present
-      // If you have multiple files, append them with the same key 'file'
-      const fileField = videoForm.getFieldValue("file");
-      if (fileField) {
-        // AntD Upload value may be an array of file objects
-        if (Array.isArray(fileField)) {
-          fileField.forEach((f) => {
-            if (f && f.originFileObj) formData.append("file", f.originFileObj);
-            else if (f && f instanceof File) formData.append("file", f);
-          });
-        } else if (fileField.originFileObj) {
-          formData.append("file", fileField.originFileObj);
-        } else if (fileField instanceof File) {
-          formData.append("file", fileField);
-        }
-      }
-
-      const res = await uploadLesson(formData, token, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      toast.success("Lesson uploaded successfully!");
-      console.log("✅ Response:", res.data);
-      // after upload, refresh sections/lessons from server to pick up uploaded contentUrl
-      await fetchSections();
-    } catch (err) {
-      console.error("❌ Upload failed:", err);
-      toast.error("Failed to upload lesson!");
-    }
-  };
 
   const handleCreateSection = async () => {
     try {
@@ -279,32 +207,6 @@ const CourseBuilder = () => {
     setEditingSection(section);
     sectionForm.setFieldsValue(section);
     setIsSectionModalVisible(true);
-  };
-
-  const handleSaveSection = async (values) => {
-    try {
-      if (editingSection) {
-        setSections(
-          sections.map((s) =>
-            s.id === editingSection.id ? { ...s, ...values } : s
-          )
-        );
-        message.success("Section updated successfully");
-      } else {
-        const newSection = {
-          id: `section-${Date.now()}`,
-          ...values,
-          orderIndex: sections.length + 1,
-          videos: [],
-        };
-        setSections([...sections, newSection]);
-        message.success("Section added successfully");
-      }
-      setIsSectionModalVisible(false);
-      sectionForm.resetFields();
-    } catch (error) {
-      message.error("Failed to save section");
-    }
   };
 
   const handleDeleteSection = (sectionId) => {
@@ -495,7 +397,11 @@ const CourseBuilder = () => {
     });
   };
 
-  const totalVideos = sections.reduce((sum, s) => sum + s.videos?.length, 0);
+  const totalVideos = (sections || []).reduce(
+    (sum, s) => sum + (s.lessons?.length || 0),
+    0
+  );
+
   const totalDuration = sections.reduce(
     (sum, s) => sum + s.videos?.reduce((vSum, v) => vSum + v.duration, 0),
     0
@@ -649,7 +555,11 @@ const CourseBuilder = () => {
                             className="flex items-center justify-between p-3 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
                           >
                             <div className="flex items-center gap-3">
-                              <PlayCircleOutlined className="text-blue-600 text-lg" />
+                              {lesson.contentType === "video" ? (
+                                <PlayCircleOutlined className="text-blue-600 text-lg" />
+                              ) : (
+                                <FileTextOutlined className="text-green-600 text-lg" />
+                              )}
                               <div>
                                 <div className="font-medium text-gray-900">
                                   {lesson.title}

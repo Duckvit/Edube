@@ -5,10 +5,17 @@ import { UserRegister, UserLogin, getProfile } from "../../apis/UserServices";
 import { createMentor } from "../../apis/MentorServices";
 import { createLearner } from "../../apis/LearnerServices";
 import { Modal, Form, Input, Button, Divider } from "antd";
-import { MailOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
+import {
+  MailOutlined,
+  LockOutlined,
+  UserOutlined,
+  TrophyOutlined,
+} from "@ant-design/icons";
 import { roleForComponent } from "../../utils/constant";
 import { useUserStore } from "../../store/useUserStore";
 import icons from "../../utils/icon";
+
+const { TextArea } = Input;
 
 export const PublicNavigate = ({
   openSignIn,
@@ -115,19 +122,42 @@ export const PublicNavigate = ({
   const handleMentorRegister = async (values) => {
     setLoading(true);
     try {
+      // Step 1: Register the user first
       const mentorValues = { ...values, role: "mentor" };
-      const response = await UserRegister(mentorValues);
-      setLoading(false);
+      const userResponse = await UserRegister(mentorValues);
 
-      if (response && response.status === 200) {
-        toast.success("Mentor Registration Successful");
-        setShowMentorSignUp(false);
-        switchToSignIn();
-      } else if (response?.status === 400) {
+      if (userResponse && userResponse.status === 200) {
+        // Step 2: Create mentor profile with additional fields
+        const mentorProfile = {
+          user: {
+            id: userResponse.data.user.id,
+          },
+          bio: values.bio,
+          expertiseAreas: values.expertiseAreas,
+          qualification: values.qualification,
+        };
+
+        const mentorResponse = await createMentor(mentorProfile);
+        setLoading(false);
+
+        if (mentorResponse && mentorResponse.status === 201) {
+          toast.success("Mentor Registration Successful");
+          setShowMentorSignUp(false);
+          switchToSignIn();
+        } else if (mentorResponse?.status === 400) {
+          toast.error(
+            mentorResponse.data?.message || "Failed to create mentor profile."
+          );
+        } else {
+          toast.error("Failed to create mentor profile.");
+        }
+      } else if (userResponse?.status === 400) {
+        setLoading(false);
         toast.error(
-          response.data.message || "Registration failed, please try again."
+          userResponse.data?.message || "Registration failed, please try again."
         );
       } else {
+        setLoading(false);
         toast.error("Unexpected error occurred, please try again.");
       }
     } catch (error) {
@@ -600,6 +630,57 @@ export const PublicNavigate = ({
                     id="mentor-confirm-password"
                     prefix={<LockOutlined className="text-gray-400" />}
                     placeholder="Confirm your password"
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Bio"
+                  name="bio"
+                  rules={[
+                    { required: true, message: "Please enter your bio" },
+                    // { min: 50, message: "Bio must be at least 50 characters" },
+                  ]}
+                >
+                  <TextArea
+                    rows={4}
+                    placeholder="Tell us about yourself and your passion for teaching..."
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Expertise Areas"
+                  name="expertiseAreas"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please enter your expertise areas",
+                    },
+                    // { min: 10, message: "Expertise areas must be at least 10 characters" },
+                  ]}
+                >
+                  <TextArea
+                    rows={3}
+                    placeholder="e.g., C++, Java, Data Structure & Algorithm, Web Development..."
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Qualifications"
+                  name="qualification"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please enter your qualifications",
+                    },
+                    // { min: 10, message: "Qualifications must be at least 10 characters" },
+                  ]}
+                >
+                  <Input
+                    prefix={<TrophyOutlined className="text-gray-400" />}
+                    placeholder="e.g., Top 10 Students in the class, 5 years experience..."
                     className="rounded-xl"
                   />
                 </Form.Item>

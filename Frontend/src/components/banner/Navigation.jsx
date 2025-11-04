@@ -113,11 +113,11 @@ const Navigation = ({ children, menuNavbar, showSidebar = true }) => {
         </NavLink>
       ),
     },
-    {
-      key: "settings",
-      icon: <SettingOutlined />,
-      label: "Settings",
-    },
+    // {
+    //   key: "settings",
+    //   icon: <SettingOutlined />,
+    //   label: "Settings",
+    // },
     {
       key: "logout",
       icon: <LogoutOutlined />,

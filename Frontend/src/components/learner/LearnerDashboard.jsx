@@ -88,8 +88,8 @@ export const LearnerDashboard = () => {
     const fetchEnrollCourses = async () => {
       try {
         const token = localStorage.getItem("token");
-        const learnerId =
-          userData?.id || useUserStore.getState().userData?.id || 1;
+        const learnerId = userData?.learner.id;
+        console.log("userData", userData)
         if (!token || !learnerId) {
           setError("Thiếu token hoặc learnerId");
           return;

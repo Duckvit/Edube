@@ -6,6 +6,7 @@ import {
   createEnrollment,
   getFreeEnrollments,
 } from "../../apis/EnrollmentServices";
+import { createConversation } from "../../apis/ChatServices";
 import { toast } from "react-toastify";
 import {
   PlayCircleOutlined,
@@ -46,6 +47,7 @@ const CoursePreview = () => {
           id: c.id || c.courseId || c._id || id,
           title: c.title || c.name || "Untitled Course",
           mentor: c.mentor?.user?.fullName || "Unknown",
+          mentorId: c.mentor?.id || null,
           category: c.category || "General",
           level: c.level || "All",
           rating: c.rating || 5,
@@ -90,12 +92,9 @@ const CoursePreview = () => {
       const priceNum = Number(course.price || 0);
       if (priceNum === 0) {
         // create enrollment directly
-        const learnerId =
-          useUserStore.getState().userData?.id ||
-          Number(localStorage.getItem("learnerId")) ||
-          1;
+        const userId = useUserStore.getState().userData?.id || Number(localStorage.getItem("userId")) || 1;
         const payload = {
-          learner: { id: learnerId },
+          learner: { id: userId },
           course: { id: courseId },
           amountPaid: 0.0,
           status: "active",
@@ -105,6 +104,22 @@ const CoursePreview = () => {
         const res = await createEnrollment(payload, token);
         if (res?.id) {
           toast.success("Enrolled successfully. Redirecting to course...");
+          
+          // Create conversation with mentor after successful enrollment
+          if (course.mentorId) {
+            try {
+              await createConversation({
+                learner: { id: userId },
+                mentor: { id: course.mentorId },
+                course: { id: courseId },
+              });
+              console.log("✅ Conversation created with mentor");
+            } catch (convError) {
+              console.warn("Failed to create conversation:", convError);
+              // Don't block navigation if conversation creation fails
+            }
+          }
+          
           navigate(`/learner/course-detail/${courseId}`);
         } else {
           console.error("Enrollment API returned unexpected response", res);
@@ -119,6 +134,23 @@ const CoursePreview = () => {
       if (course?.price === 0 || !course?.price) {
         await getFreeEnrollments(token, payload);
         toast.success("Enrolled successfully. Redirecting to course...");
+        
+        // Create conversation with mentor after successful enrollment
+        if (course.mentorId) {
+          try {
+            const userId = useUserStore.getState().userData?.id || Number(localStorage.getItem("userId")) || 1;
+            await createConversation({
+              learner: { id: userId },
+              mentor: { id: course.mentorId },
+              course: { id: courseId },
+            });
+            console.log("✅ Conversation created with mentor");
+          } catch (convError) {
+            console.warn("Failed to create conversation:", convError);
+            // Don't block navigation if conversation creation fails
+          }
+        }
+        
         navigate(`/learner/course-detail/${courseId}`);
       } else {
         const res = await createPayment(payload, token);

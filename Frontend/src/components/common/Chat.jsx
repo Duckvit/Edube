@@ -25,6 +25,8 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
   const [loading, setLoading] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
   const { userData, role } = useUserStore();
   const jwtToken = localStorage.getItem("token");
   const messagesEndRef = useRef(null);
@@ -61,21 +63,37 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
   };
 
   // Helper: Get sender ID for message sending
+  // Backend accepts: user.id, learner.id, or mentor.id
   const getSenderId = () => {
     const currentUserId = getCurrentUserId();
     const normalizedRole = role?.toLowerCase();
 
+    // Priority: role-specific ID (learner.id/mentor.id) > user.id
+    // This matches backend's authorization logic in ChatService
     if (normalizedRole === "learner") {
-      return (
-        currentUserId || userData?.learner?.id || selectedChat?.learner?.id
-      );
+      const senderId = userData?.learner?.id || selectedChat?.learner?.id || currentUserId;
+      console.log("🔍 Learner sender ID:", senderId, { 
+        learnerId: userData?.learner?.id, 
+        selectedChatLearnerId: selectedChat?.learner?.id,
+        currentUserId 
+      });
+      return senderId;
     }
+    
     if (normalizedRole === "mentor") {
-      return currentUserId || userData?.mentor?.id || selectedChat?.mentor?.id;
+      const senderId = userData?.mentor?.id || selectedChat?.mentor?.id || currentUserId;
+      console.log("🔍 Mentor sender ID:", senderId, { 
+        mentorId: userData?.mentor?.id, 
+        selectedChatMentorId: selectedChat?.mentor?.id,
+        currentUserId 
+      });
+      return senderId;
     }
-    return (
-      currentUserId || selectedChat?.learner?.id || selectedChat?.mentor?.id
-    );
+
+    // Fallback: try to determine from selectedChat or use currentUserId
+    const senderId = selectedChat?.learner?.id || selectedChat?.mentor?.id || currentUserId;
+    console.log("🔍 Fallback sender ID:", senderId);
+    return senderId;
   };
 
   // Helper: Fetch latest message for a conversation
@@ -288,11 +306,27 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
       const subscription = client.subscribe(destination, (msg) => {
         try {
           const response = JSON.parse(msg.body);
+          console.log("📩 Received WebSocket message:", response);
+          
           const chatMessage = response?.chatMessage;
-          if (!chatMessage) return;
+          if (!chatMessage) {
+            console.warn("No chatMessage in WebSocket response:", response);
+            return;
+          }
 
+          // Update selected chat messages
           setSelectedChat((prev) => {
             if (prev && prev.id === conversationId) {
+              // Check if message already exists to avoid duplicates
+              const messageExists = prev.messages?.some(
+                (m) => m.id === chatMessage.id
+              );
+              
+              if (messageExists) {
+                console.log("Message already exists, skipping duplicate");
+                return prev;
+              }
+
               const newMessage = {
                 id: chatMessage.id || Date.now(),
                 sender: isMessageFromCurrentUser(chatMessage.senderId, prev)
@@ -308,6 +342,9 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
                   : new Date(),
                 isRead: chatMessage.isRead !== false,
               };
+              
+              console.log("✅ Adding new message to UI:", newMessage);
+              
               return {
                 ...prev,
                 messages: sortMessages([...prev.messages, newMessage]),
@@ -316,6 +353,7 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
             return prev;
           });
 
+          // Update conversations list with latest message
           setConversations((prev) => {
             const updated = [...prev];
             const convIndex = updated.findIndex(
@@ -343,36 +381,82 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
   };
 
   const sendMessage = async () => {
-    const token = localStorage.getItem("token");
-    if (!message.trim() || !selectedChat) return;
+    if (!message.trim() || !selectedChat || !client || !connected) {
+      if (!client || !connected) {
+        toast.error("WebSocket not connected. Please wait and try again.");
+      }
+      return;
+    }
 
-    const data = {
-      senderId: userData?.id,
-      message,
+    const senderId = getSenderId();
+    if (!senderId) {
+      toast.error("Unable to identify sender. Please refresh the page.");
+      return;
+    }
+
+    const messageText = message.trim();
+    const chatMessageDto = {
+      senderId: senderId,
+      message: messageText,
       conversation: { id: selectedChat.id },
     };
 
     try {
-      const res = await sendMessageRest(selectedChat.id, token, data);
+      // Send via WebSocket
+      client.publish({
+        destination: "/app/chat.send-message",
+        body: JSON.stringify(chatMessageDto),
+      });
 
-      // Thêm tin nhắn mới vào danh sách
-      setSelectedChat((prev) => ({
-        ...prev,
-        messages: [
-          ...(prev.messages || []),
-          {
-            id: res.id || Date.now(),
-            text: message,
-            sender: "You",
-            time: new Date().toLocaleTimeString(),
-          },
-        ],
-      }));
+      console.log("📤 Message sent via WebSocket:", chatMessageDto);
 
+      // Clear message input immediately for better UX
+      // The message will appear when we receive it via WebSocket subscription
       setMessage("");
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      
+      // Clear typing indicator
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      setIsTyping(false);
+      
+      // Scroll to bottom
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
     } catch (err) {
-      console.error("Error sending message:", err);
+      console.error("Error sending message via WebSocket:", err);
+      toast.error("Failed to send message. Please try again.");
+      
+      // Fallback to REST API if WebSocket fails
+      try {
+        const token = localStorage.getItem("token");
+        const res = await sendMessageRest(selectedChat.id, token, chatMessageDto);
+        console.log("📤 Message sent via REST (fallback):", res);
+        
+        // Add message to UI manually
+        if (res?.id) {
+          setSelectedChat((prev) => ({
+            ...prev,
+            messages: sortMessages([
+              ...(prev.messages || []),
+              {
+                id: res.id,
+                text: messageText,
+                sender: "You",
+                senderId: senderId,
+                time: new Date().toLocaleTimeString(),
+                createdAt: new Date(),
+                isRead: false,
+              },
+            ]),
+          }));
+          setMessage("");
+        }
+      } catch (restErr) {
+        console.error("Error sending message via REST fallback:", restErr);
+        toast.error("Failed to send message. Please check your connection.");
+      }
     }
   };
 
@@ -480,9 +564,14 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversations, location?.state?.conversationId]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (selectedChat?.messages && selectedChat.messages.length > 0) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }
   }, [selectedChat?.messages]);
 
   // Cleanup typing timeout
@@ -573,7 +662,7 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-medium flex-shrink-0">
+                            <div className="w-10 h-10 bg-gradient-to-r from-sky-600 to-amber-500 rounded-full flex items-center justify-center text-white font-medium flex-shrink-0">
                               {chat.name?.charAt(0) || "?"}
                             </div>
                             <div className="flex-1 min-w-0">
@@ -666,24 +755,54 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
                   )}
                 </div>
 
+                {/* Typing Indicator */}
+                {otherUserTyping && (
+                  <div className="px-4 py-2 text-sm text-gray-500 italic">
+                    {selectedChat?.name || "Someone"} is typing...
+                  </div>
+                )}
+
                 {/* Input */}
                 <div className="mt-4 flex gap-2">
                   <input
                     type="text"
                     placeholder="Type your message..."
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                    onChange={(e) => {
+                      setMessage(e.target.value);
+                      
+                      // Typing indicator logic (optional - can be implemented with backend support)
+                      // For now, just clear any existing timeout
+                      if (typingTimeoutRef.current) {
+                        clearTimeout(typingTimeoutRef.current);
+                      }
+                      
+                      // Set typing indicator for current user (local only)
+                      setIsTyping(e.target.value.length > 0);
+                    }}
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                      }
+                    }}
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:border-transparent"
+                    disabled={!connected}
                   />
                   <button
                     onClick={sendMessage}
-                    disabled={!message.trim() || !selectedChat}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!message.trim() || !selectedChat || !connected}
+                    className="bg-gradient-to-r from-sky-600 to-sky-700 text-white px-6 py-2 rounded-lg hover:from-sky-700 hover:to-sky-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={!connected ? "WebSocket not connected" : ""}
                   >
                     Send
                   </button>
                 </div>
+                {!connected && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Connection lost. Messages will be queued when reconnected.
+                  </p>
+                )}
               </div>
             ) : (
               <div

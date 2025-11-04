@@ -57,17 +57,32 @@ export default function RoleSelectionPage() {
         ...values,
       };
 
+      // Ensure token is in localStorage for axios interceptor
+      if (currentToken) {
+        localStorage.setItem("token", currentToken);
+      }
+
       let response;
       if (selectedRole === "mentor") {
-        response = await createMentor(payload, currentToken);
+        // Token is automatically added by axiosConfig interceptor from localStorage
+        response = await createMentor(payload);
       } else if (selectedRole === "learner") {
         response = await createLearner(payload, currentToken);
       } else {
         throw new Error("Invalid role selection");
       }
 
-      if (!response || response.status >= 400) {
-        throw new Error("Failed to create user profile");
+      // Check response status - createMentor now returns res (not res.data)
+      const httpStatus = response?.status;
+      const backendStatus = response?.data?.statusCode;
+      const isSuccess = 
+        httpStatus === 200 || 
+        httpStatus === 201 || 
+        backendStatus === 200 || 
+        backendStatus === 201;
+
+      if (!isSuccess) {
+        throw new Error(response?.data?.message || "Failed to create user profile");
       }
 
       const updatedRole = selectedRole.toUpperCase();

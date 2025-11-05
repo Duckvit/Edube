@@ -12,6 +12,13 @@ import {
   File as FileIcon,
 } from "lucide-react";
 import { uploadLesson } from "../../apis/LessonServices";
+import {
+  getEnrollmentsByCourse,
+  patchEnrollmentProgress,
+  patchEnrollmentStatus,
+} from "../../apis/EnrollmentServices";
+import { getLessonProgressByEnrollment } from "../../apis/LessonProgressServices";
+import { getCourseById } from "../../apis/CourseServices";
 import { useNavigate } from "react-router";
 import { useUserStore } from "../../store/useUserStore";
 
@@ -108,6 +115,105 @@ export const UploadLesson = () => {
       // Optionally reset state or navigate
       setFiles([]);
       setMaterials([]);
+      // Recompute enrollments progress for this course so learners' progress/status are up-to-date
+      try {
+        const payload = res?.data || res;
+        const courseId =
+          payload?.section?.course?.id ||
+          payload?.section?.courseId ||
+          payload?.course?.id ||
+          payload?.courseId ||
+          null;
+
+        if (courseId) {
+          // fetch enrollments for this course
+          const enrollData = await getEnrollmentsByCourse(courseId, token);
+          const enrollments = Array.isArray(enrollData)
+            ? enrollData
+            : enrollData?.content || enrollData?.data || [];
+
+          // optionally get course info for fallback totalLessons
+          let courseInfo = null;
+          try {
+            courseInfo = await getCourseById(courseId, token);
+          } catch (e) {
+            console.warn("Could not fetch course info for totalLessons", e);
+          }
+
+          for (const enroll of enrollments) {
+            try {
+              const enrollmentId = enroll.id;
+              const totalLessons =
+                enroll?.course?.totalLessons || courseInfo?.totalLessons || 0;
+
+              // count completed lesson-progress entries for this enrollment
+              let completedCount = 0;
+              try {
+                const lp = await getLessonProgressByEnrollment(
+                  enrollmentId,
+                  token
+                );
+                const list = Array.isArray(lp)
+                  ? lp
+                  : lp?.content || lp?.data || [];
+                completedCount = list.filter(
+                  (p) => p.completed === true
+                ).length;
+              } catch (e) {
+                console.warn(
+                  "Failed to get lesson progress for enrollment",
+                  enrollmentId,
+                  e
+                );
+              }
+
+              // compute percentage
+              let progressPercentage = 0;
+              if (totalLessons === 0) {
+                progressPercentage = 100;
+              } else {
+                progressPercentage = Math.round(
+                  (completedCount / totalLessons) * 100
+                );
+              }
+
+              const prevStatus = String(enroll.status || "").toLowerCase();
+              // If previously completed and now there's a new lesson not completed -> set active
+              if (prevStatus === "completed" && completedCount < totalLessons) {
+                await patchEnrollmentStatus(enrollmentId, "active", token);
+              }
+
+              // update progress
+              await patchEnrollmentProgress(
+                enrollmentId,
+                progressPercentage,
+                token
+              );
+
+              // if now 100% ensure completed
+              if (progressPercentage >= 100) {
+                await patchEnrollmentStatus(enrollmentId, "completed", token);
+              }
+            } catch (e) {
+              console.error(
+                "Failed to update enrollment after lesson upload",
+                e
+              );
+            }
+          }
+
+          // notify frontend to refresh enrolled views
+          window.dispatchEvent(
+            new CustomEvent("enrollment:updated", { detail: { courseId } })
+          );
+        } else {
+          console.warn(
+            "CourseId not found in upload response; skipping enrollment recompute."
+          );
+        }
+      } catch (e) {
+        console.error("Enrollment recompute after upload failed", e);
+      }
     } catch (err) {
       console.error(err);
       message.error("Upload thất bại!");

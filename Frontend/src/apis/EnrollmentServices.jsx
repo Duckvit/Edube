@@ -25,6 +25,17 @@ export const createFreeEnrollments = async (token, data) => {
   return res.data;
 };
 
+// Get enrollments by course: GET /api/enrollments/course/{courseId}
+export const getEnrollmentsByCourse = async (courseId, token) => {
+  const config = {};
+  if (token) config.headers = { Authorization: `Bearer ${token}` };
+  const res = await axiosConfig.get(
+    `/api/enrollments/course/${courseId}`,
+    config
+  );
+  return res.data;
+};
+
 // Patch enrollment progress: PATCH /api/enrollments/{id}/progress?progressPercentage={value}
 export const patchEnrollmentProgress = async (
   enrollmentId,

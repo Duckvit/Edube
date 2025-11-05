@@ -4,12 +4,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { UserRegister, UserLogin, getProfile } from "../../apis/UserServices";
 import { createMentor } from "../../apis/MentorServices";
 import { createLearner } from "../../apis/LearnerServices";
-import { Modal, Form, Input, Button, Divider } from "antd";
+import { Modal, Form, Input, Button, Divider, Select } from "antd";
 import {
   MailOutlined,
   LockOutlined,
   UserOutlined,
   TrophyOutlined,
+  BookOutlined,
+  ReadOutlined,
+  BulbOutlined,
 } from "@ant-design/icons";
 import { roleForComponent } from "../../utils/constant";
 import { useUserStore } from "../../store/useUserStore";
@@ -100,29 +103,7 @@ export const PublicNavigate = ({
   const handleRegister = async (values) => {
     setLoading(true);
     try {
-      const response = await UserRegister(values);
-      setLoading(false);
-
-      if (response && response.status === 200) {
-        toast.success("Register Successful");
-        switchToSignIn();
-      } else if (response?.status === 400) {
-        toast.error(response.data.message || "Login failed, please try again.");
-      } else {
-        toast.error("Unexpected error occurred, please try again.");
-      }
-    } catch (error) {
-      setLoading(false);
-      console.log("Error register: ", error);
-      toast.error("An error occurred during login. Please check your network.");
-    }
-  };
-
-  const handleMentorRegister = async (values) => {
-    setLoading(true);
-    try {
-      console.log("🚀 Starting mentor registration...");
-
+      // Step 1: Create user account
       const userPayload = {
         username: values.username,
         email: values.email,
@@ -130,9 +111,7 @@ export const PublicNavigate = ({
         fullName: values.fullName,
       };
 
-      console.log("📝 Step 1: Creating user...", userPayload);
       const userResponse = await UserRegister(userPayload);
-      console.log("✅ User response:", userResponse);
 
       // Check both HTTP status and backend statusCode
       const userHttpStatus = userResponse?.status;
@@ -143,166 +122,50 @@ export const PublicNavigate = ({
         userBackendStatus === 200 ||
         userBackendStatus === 201;
 
-      if (isUserSuccess) {
-        const createdUser = userResponse.data?.user || userResponse.data;
-        console.log("✅ User created successfully:", createdUser);
-
-        if (!createdUser?.id) {
-          console.error("❌ User ID not found in response:", createdUser);
-          toast.error("❌ Failed to get user ID. Please try again.");
-          setLoading(false);
-          return;
-        }
-
-        // Step 2: Auto-login to get token for creating mentor profile
-        console.log("📝 Step 2: Auto-login to get token...");
-        const loginPayload = {
-          username: values.username,
-          password: values.password,
-        };
-
-        let loginToken = null;
-        let loginResponse = null;
-        let userRole = "MENTOR";
-
-        try {
-          loginResponse = await UserLogin(loginPayload);
-          console.log("✅ Login response:", loginResponse);
-
-          if (loginResponse?.data?.token) {
-            loginToken = loginResponse.data.token;
-            userRole = loginResponse.data?.role || "MENTOR";
-            console.log("✅ Token obtained:", loginToken);
-            console.log("✅ User role:", userRole);
-
-            // Save token to localStorage so axios interceptor can use it
-            localStorage.setItem("token", loginToken);
-            console.log("✅ Token saved to localStorage");
-          } else {
-            console.error("❌ No token in login response:", loginResponse);
-            toast.error(
-              "⚠️ User created but login failed. Please login manually."
-            );
-            setShowMentorSignUp(false);
-            switchToSignIn();
-            setLoading(false);
-            return;
-          }
-        } catch (loginError) {
-          console.error("❌ Login error:", loginError);
-          toast.error(
-            "⚠️ User created but auto-login failed. Please login manually to complete mentor registration."
-          );
-          setShowMentorSignUp(false);
-          switchToSignIn();
-          setLoading(false);
-          return;
-        }
-
-        // Step 3: Create mentor profile with token
-        // Token is automatically added by axiosConfig interceptor from localStorage
-        const mentorPayload = {
-          user: { id: createdUser.id },
-          bio: values.bio,
-          expertiseAreas: values.expertiseAreas,
-          qualification: values.qualification,
-        };
-
-        console.log("📝 Step 3: Creating mentor profile...");
-        console.log("📝 Request body:", JSON.stringify(mentorPayload, null, 2));
-        console.log(
-          "📝 Token in localStorage:",
-          localStorage.getItem("token") ? "Present" : "Missing"
-        );
-        const token = localStorage.getItem("token");
-        console.log("🔑 Token being sent:", token);
-
-        const mentorResponse = await createMentor(mentorPayload, token);
-        console.log("🔑 Header token check:", token);
-
-        console.log("✅ Mentor response:", mentorResponse);
-
-        // Check both HTTP status and backend statusCode
-        // createMentor now returns res (not res.data), so check both status and data.statusCode
-        const mentorHttpStatus = mentorResponse?.status;
-        const mentorBackendStatus = mentorResponse?.data?.statusCode;
-        const isMentorSuccess =
-          mentorHttpStatus === 200 ||
-          mentorHttpStatus === 201 ||
-          mentorBackendStatus === 200 ||
-          mentorBackendStatus === 201;
-
-        if (isMentorSuccess) {
-          console.log("🎉 Mentor registration completed successfully!");
-
-          // Set user data and role in store
-          const { setModal, setUserData } = useUserStore.getState();
-          setModal(loginToken, userRole, true);
-
-          // Get profile to save user data
-          try {
-            const profileRes = await getProfile(values.username, loginToken);
-            if (profileRes?.user) {
-              setUserData(profileRes.user);
-              console.log("✅ User profile loaded:", profileRes.user);
-            }
-          } catch (profileError) {
-            console.warn("⚠️ Could not load user profile:", profileError);
-          }
-
-          toast.success("🎉 Mentor registration successful!");
-
-          // Navigate to mentor dashboard
-          const dashboardPath = roleForComponent[userRole];
-          if (userRole && dashboardPath) {
-            setTimeout(() => {
-              setShowMentorSignUp(false);
-              navigate("/" + dashboardPath);
-            }, 1000);
-          } else {
-            setTimeout(() => {
-              setShowMentorSignUp(false);
-              switchToSignIn();
-            }, 1000);
-          }
-        } else {
-          console.error("❌ Mentor creation failed:", {
-            httpStatus: mentorHttpStatus,
-            backendStatus: mentorBackendStatus,
-            message: mentorResponse?.data?.message,
-            fullResponse: mentorResponse,
-          });
-          toast.error(
-            mentorResponse?.data?.message ||
-              "❌ Failed to create mentor profile. Please check console for details."
-          );
-          // Clear token if mentor creation failed
-          localStorage.removeItem("token");
-        }
-      } else {
-        console.error("❌ User creation failed:", {
-          httpStatus: userHttpStatus,
-          backendStatus: userBackendStatus,
-          message: userResponse?.data?.message,
-          fullResponse: userResponse,
-        });
+      if (!isUserSuccess) {
         toast.error(
           userResponse?.data?.message ||
             "❌ Failed to create user. Please try again."
         );
+        setLoading(false);
+        return;
+      }
+
+      const createdUser = userResponse.data?.user || userResponse.data;
+
+      if (!createdUser?.id) {
+        toast.error("❌ Failed to get user ID. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Create learner profile
+      const learnerPayload = {
+        user: { id: createdUser.id },
+        majorField: values.majorField,
+        educationLevel: values.educationLevel,
+        learningPreferences: values.learningPreferences,
+      };
+
+      const learnerResponse = await createLearner(learnerPayload);
+
+      // createLearner returns res (full response), check HTTP status
+      // Backend returns ResponseEntity<LearnerDto> with HttpStatus.CREATED (201)
+      const learnerHttpStatus = learnerResponse?.status;
+      const isLearnerSuccess =
+        learnerHttpStatus === 200 || learnerHttpStatus === 201;
+
+      if (isLearnerSuccess) {
+        toast.success("🎉 Registration successful! Please sign in to continue.");
+        setShowSignUp(false);
+        switchToSignIn();
+      } else {
+        toast.error(
+          learnerResponse?.data?.message ||
+            "❌ Failed to create learner profile. Please try again."
+        );
       }
     } catch (error) {
-      console.error("❌ Error in mentor register:", error);
-      console.error("Error details:", {
-        message: error?.message,
-        response: error?.response,
-        data: error?.response?.data,
-        status: error?.response?.status,
-      });
-
-      // Clear token on error
-      localStorage.removeItem("token");
-
       const errorMessage =
         error?.response?.data?.message ||
         error?.message ||
@@ -311,9 +174,85 @@ export const PublicNavigate = ({
       toast.error(errorMessage);
     } finally {
       setLoading(false);
-      console.log("🏁 Mentor registration process finished");
     }
   };
+
+  const handleMentorRegister = async (values) => {
+  setLoading(true);
+  try {
+    // Step 1: Create user account
+    const userPayload = {
+      username: values.username,
+      email: values.email,
+      password: values.password,
+      fullName: values.fullName,
+    };
+
+    const userResponse = await UserRegister(userPayload);
+
+    // UserRegister returns full response, check status
+    const userHttpStatus = userResponse?.status;
+    const userBackendStatus = userResponse?.data?.statusCode;
+    const isUserSuccess =
+      userHttpStatus === 200 ||
+      userHttpStatus === 201 ||
+      userBackendStatus === 200 ||
+      userBackendStatus === 201;
+
+    if (!isUserSuccess) {
+      toast.error(
+        userResponse?.data?.message ||
+          "❌ Failed to create user. Please try again."
+      );
+      setLoading(false);
+      return;
+    }
+
+    const createdUser = userResponse.data?.user || userResponse.data;
+
+    if (!createdUser?.id) {
+      toast.error("❌ Failed to get user ID. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    // Step 2: Create mentor profile
+    const mentorPayload = {
+      user: { id: createdUser.id },
+      bio: values.bio,
+      expertiseAreas: values.expertiseAreas,
+      qualification: values.qualification,
+    };
+
+    const mentorResponse = await createMentor(mentorPayload);
+
+    // createMentor returns res.data, so mentorResponse is the Response object with statusCode
+    const isSuccess =
+      mentorResponse?.statusCode === 200 ||
+      mentorResponse?.statusCode === 201;
+
+    if (!isSuccess) {
+      throw new Error(
+        mentorResponse?.message || "❌ Failed to create mentor profile."
+      );
+    }
+
+    toast.success("🎉 Mentor registration successful! Please sign in to continue.");
+    setShowMentorSignUp(false);
+    switchToSignIn();
+  } catch (error) {
+    const errorMessage =
+      error?.response?.data?.message ||
+      error?.message ||
+      "⚠️ Registration failed. Please check your network and try again.";
+
+    toast.error(errorMessage);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   const switchToSignIn = () => {
     registerForm.resetFields();
@@ -639,6 +578,72 @@ export const PublicNavigate = ({
                     id="register-confirm-password"
                     prefix={<LockOutlined className="text-gray-400" />}
                     placeholder="Confirm your password"
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Major Field"
+                  name="majorField"
+                  rules={[
+                    { required: true, message: "Please enter your major field" },
+                  ]}
+                >
+                  <Input
+                    prefix={<BookOutlined className="text-gray-400" />}
+                    placeholder="e.g., Computer Science, Business, Engineering..."
+                    className="rounded-xl"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Education Level"
+                  name="educationLevel"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please select your education level",
+                    },
+                  ]}
+                >
+                  <Select
+                    placeholder="Select your education level"
+                    className="rounded-xl"
+                    suffixIcon={<ReadOutlined />}
+                  >
+                    <Select.Option value="High School">
+                      High School
+                    </Select.Option>
+                    <Select.Option value="Associate's Degree">
+                      Associate's Degree
+                    </Select.Option>
+                    <Select.Option value="Bachelor's Degree">
+                      Bachelor's Degree
+                    </Select.Option>
+                    <Select.Option value="Master's Degree">
+                      Master's Degree
+                    </Select.Option>
+                    <Select.Option value="Doctorate">Doctorate</Select.Option>
+                    <Select.Option value="Professional Certificate">
+                      Professional Certificate
+                    </Select.Option>
+                    <Select.Option value="Other">Other</Select.Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  label="Learning Preferences"
+                  name="learningPreferences"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please describe your learning preferences",
+                    },
+                  ]}
+                >
+                  <TextArea
+                    rows={3}
+                    placeholder="e.g., Visual learning, practical exercises, interactive discussions..."
                     className="rounded-xl"
                   />
                 </Form.Item>

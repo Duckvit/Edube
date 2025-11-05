@@ -1,0 +1,225 @@
+import React, { memo, useEffect, useState } from "react";
+import { Button, Dropdown, Layout, Menu, Avatar, Space } from "antd";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import icons from "../../utils/icon";
+import path from "../../utils/path";
+import Swal from "sweetalert2";
+import Loading from "../common/Loading";
+import { Brain } from "lucide-react";
+import {
+  CaretDownOutlined,
+  LogoutOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  SettingOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
+import { useUserStore } from "../../store/useUserStore";
+
+const Navigation = ({ children, menuNavbar, showSidebar = true }) => {
+  const navigate = useNavigate();
+  const { Header, Sider } = Layout;
+  const { IoIosNotifications } = icons;
+  const [notificationCount, setNotificationCount] = useState(3);
+  const [loading, setLoading] = useState(false);
+  const { resetUserStore, role, current, userData } = useUserStore();
+  const [collapsed, setCollapsed] = useState(false);
+  const { Content } = Layout;
+  const location = useLocation();
+  const [searchFor, setSearchFor] = useState("");
+
+  // useEffect(() => {
+  //   const subPath = location.pathname.split('/');
+
+  //   if (
+  //     subPath[subPath.length - 1] === 'student' ||
+  //     subPath.push() === path.STUDENT_GROUP ||
+  //     subPath.includes('profile-user')
+  //   )
+  //     setSearchFor('');
+  //   else setSearchFor(subPath.pop());
+  // }, [location.pathname]);
+
+  const siderStyle = {
+    overflow: "auto",
+    height: "100vh",
+    position: "sticky",
+    insetInlineStart: 0,
+    top: 0,
+    bottom: 0,
+    scrollbarWidth: "thin",
+    scrollbarGutter: "stable",
+  };
+
+  const handleClick = () => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+    }, 200);
+  };
+
+  const handleLogOut = () => {
+    // Hiển thị hộp thoại xác nhận đăng xuất
+    Swal.fire({
+      title: "Are you sure?", // Tiêu đề của hộp thoại
+      text: "Log Out Your Account!", // Nội dung chính của hộp thoại
+      icon: "warning", // Hiển thị biểu tượng cảnh báo
+      showCancelButton: true, // Hiển thị nút hủy
+      confirmButtonText: "Yes, Log Out", // Văn bản nút xác nhận
+      cancelButtonText: "No, cancel.", // Văn bản nút hủy
+      reverseButtons: true, // Đảo ngược vị trí các nút
+    }).then((result) => {
+      // Kiểm tra kết quả khi người dùng nhấn vào nút
+      if (result.isConfirmed) {
+        // Nếu người dùng xác nhận đăng xuất
+        resetUserStore(); // Gọi hàm reset trạng thái người dùng (đăng xuất)
+        navigate("/");
+        // Hoặc hiển thị một thông báo thành công khác với SweetAlert2 (nếu muốn)
+        Swal.fire({
+          title: "Logged Out!",
+          text: "You have successfully logged out.",
+          icon: "success",
+          timer: 2000, // Đóng sau 2 giây
+          showConfirmButton: false, // Ẩn nút OK
+        });
+      } else if (result.dismiss === Swal.DismissReason.cancel) {
+        // Nếu người dùng hủy
+        Swal.fire({
+          title: "Cancelled",
+          text: "Cancelled Log Out!",
+          icon: "error",
+          timer: 2000, // Đóng sau 2 giây
+          showConfirmButton: false, // Ẩn nút OK
+        });
+      }
+    });
+  };
+
+  const items = [
+    {
+      key: "account",
+      label: "My Account",
+      disabled: true,
+    },
+    {
+      type: "divider",
+    },
+    {
+      key: "profile",
+      icon: <UserOutlined />,
+      label: (
+        <NavLink to={path.USER_PROFILE} className="text-white">
+          View Profile
+        </NavLink>
+      ),
+    },
+    // {
+    //   key: "settings",
+    //   icon: <SettingOutlined />,
+    //   label: "Settings",
+    // },
+    {
+      key: "logout",
+      icon: <LogoutOutlined />,
+      label: "Log Out",
+      onClick: handleLogOut,
+    },
+  ];
+
+  return (
+    <Layout className="bg-gray-300 flex w-3/5 h-screen ">
+      {showSidebar && (
+        <>
+          {/* Vertical Sidebar */}
+          <Sider
+            trigger={null}
+            collapsible
+            collapsed={collapsed}
+            // theme="dark"
+            className="shadow-lg bg-gray-200 text-white"
+            // width={250}
+          >
+            {/* Logo */}
+            <div className="h-[8vh] flex items-center justify-center py-[1vh] bg-gray-200 ">
+              <div className="w-10 h-10 flex items-center justify-center">
+                <img src="/FIB_logo.png" className="object-cover h-[3vh]" />
+              </div>
+
+              {!collapsed && (
+                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent">
+                  Edube
+                </span>
+              )}
+            </div>
+            <Menu
+              className="h-[92vh] w-full flex flex-col gap-1 text-white font-semibold overflow-auto"
+              mode="inline"
+              items={menuNavbar}
+              theme={role === "ADMIN" ? "dark" : "light"}
+            />
+          </Sider>
+        </>
+      )}
+
+      <Layout className="relative">
+        {/* Top Header */}
+        <Header
+          style={{ backgroundColor: "#e5e7eb" }}
+          className="bg-gray-200 p-0 flex items-center !h-[8vh] justify-between"
+        >
+          {/* Logo khi sidebar ẩn */}
+          {!showSidebar && (
+            <div className="flex items-center gap-2 pl-4">
+              <img src="/FIB_logo.png" className="object-cover h-[3vh]" />
+              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent">
+                Edube
+              </span>
+            </div>
+          )}
+
+          {/* Collapse Button */}
+          {showSidebar && (
+            <Button
+              type="text"
+              size="20"
+              onClick={() => setCollapsed(!collapsed)}
+              icon={
+                collapsed ? (
+                  <MenuUnfoldOutlined style={{ fontSize: 25 }} />
+                ) : (
+                  <MenuFoldOutlined style={{ fontSize: 25 }} />
+                )
+              }
+            />
+          )}
+
+          {/* User Menu */}
+          <div className="flex gap-5 pr-[2rem] items-center">
+            <Dropdown menu={{ items }} placement="bottomRight" arrow>
+              <Space>
+                <Avatar
+                  icon={<UserOutlined />}
+                  alt="avatar"
+                  className="object-cover h-[6vh] w-[6vh] rounded-full cursor-pointer"
+                />
+                <CaretDownOutlined />
+              </Space>
+            </Dropdown>
+          </div>
+        </Header>
+
+        <Content className="p-2 overflow-auto h-[calc(100vh-8vh)] w-full">
+          <div>
+            {loading ? (
+              <Loading /> // Hiển thị component loading
+            ) : (
+              children // Không cần dấu ngoặc nhọn ở đây
+            )}
+          </div>
+        </Content>
+      </Layout>
+    </Layout>
+  );
+};
+
+export default memo(Navigation);

@@ -879,39 +879,39 @@ const CourseDetail = () => {
                         )}
                         <List
                           dataSource={section.lessons || []}
-                          renderItem={(lesson, index) => (
-                            <List.Item
-                              className={`cursor-pointer hover:bg-gray-50 px-2 py-3 rounded ${
-                                lesson.locked ? "opacity-50" : ""
-                              }`}
-                              onClick={() => {
-                                if (!lesson.locked) {
-                                  // mark that the user actively clicked a lesson so we trigger a server update
-                                  setHasUserClickedLesson(true);
-                                  setSelectedSectionIndex(sectionIndex);
-                                  setSelectedLessonIndex(index);
-                                }
-                              }}
-                            >
+                          renderItem={(lesson, index) => {
+                            const isSelected =
+                              selectedSectionIndex === sectionIndex &&
+                              selectedLessonIndex === index;
+                            return (
+                              <List.Item
+                                className={`cursor-pointer px-2 py-3 rounded transition-colors ${
+                                  lesson.locked
+                                    ? "opacity-50"
+                                    : isSelected
+                                    ? "bg-blue-50 border-l-4 border-blue-500"
+                                    : "hover:bg-gray-50"
+                                }`}
+                                onClick={() => {
+                                  if (!lesson.locked) {
+                                    // mark that the user actively clicked a lesson so we trigger a server update
+                                    setHasUserClickedLesson(true);
+                                    setSelectedSectionIndex(sectionIndex);
+                                    setSelectedLessonIndex(index);
+                                  }
+                                }}
+                              >
                               <div className="flex items-center justify-between w-full">
                                 <div className="flex items-center space-x-3">
-                                  {
-                                    // lesson.locked ? (
-                                    //   <LockOutlined className="text-gray-400" />
-                                    // ) : lesson.completed ? (
-                                    //   <CheckCircleOutlined className="text-green-500" />
-                                    // ) :
-                                    (() => {
-                                      const ct = String(
-                                        lesson.contentType || ""
-                                      ).toLowerCase();
-                                      return ct === "video" ? (
-                                        <PlayCircleOutlined className="text-blue-500" />
-                                      ) : (
-                                        <FileTextOutlined className="text-green-600" />
-                                      );
-                                    })()
-                                  }
+                                  {lesson.locked ? (
+                                    <LockOutlined className="text-gray-400" />
+                                  ) : lesson.completed ? (
+                                    <CheckCircleOutlined className="text-green-500" />
+                                  ) : lesson.contentType === "video" ? (
+                                    <PlayCircleOutlined className="text-blue-500" />
+                                  ) : (
+                                    <FileTextOutlined className="text-green-600" />
+                                  )}
                                   <div>
                                     <div className="font-medium text-sm">
                                       {lesson.title}
@@ -923,13 +923,13 @@ const CourseDetail = () => {
                                 </div>
                               </div>
                             </List.Item>
-                          )}
-                        />
-                      </div>
-                    ),
-                  })
-                )}
-              />
+                            );
+                          }}
+        />
+      </div>
+    ),
+  }))}
+/>
             </Card>
           </div>
         </div>

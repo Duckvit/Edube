@@ -24,6 +24,7 @@ import {
   BookOutlined,
   TrophyOutlined,
 } from "@ant-design/icons";
+import { getAllActiveCoursesByMentorId } from "../../apis/CourseServices";
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -37,6 +38,7 @@ export const UserProfile = () => {
   const { name, id } = useParams();
 
   const [profile, setProfile] = useState(null);
+  const [mentorStats, setMentorStats] = useState(null);
 
   // effectiveRole prefers backend-detected role (profile.learner/profile.mentor), then displayRole, then store role
   const effectiveRole =
@@ -89,6 +91,20 @@ export const UserProfile = () => {
             ? "mentor"
             : role || "learner";
           setDisplayRole(derived);
+        }
+        // If mentor, fetch mentor stats (active courses, total learners)
+        if (user && (user.mentor || derived === "mentor")) {
+          try {
+            const mentorId = (user.mentor && user.mentor.id) || user.id;
+            const token = localStorage.getItem("token");
+            if (mentorId && token) {
+              const data = await getAllActiveCoursesByMentorId(mentorId, token);
+              // The API from MentorDashboard returns structure with totalActiveCourses and totalLearners
+              setMentorStats(data || {});
+            }
+          } catch (err) {
+            console.error("Failed to fetch mentor stats for profile", err);
+          }
         }
       } catch (err) {
         console.error("Error fetching profile:", err);
@@ -354,7 +370,7 @@ export const UserProfile = () => {
                   <>
                     <div className="text-center p-4 bg-blue-50 rounded-lg">
                       <div className="text-3xl font-bold text-blue-600 mb-1">
-                        15
+                        {mentorStats?.totalActiveCourses ?? 15}
                       </div>
                       <div className="text-sm text-gray-600">
                         Active Courses
@@ -362,7 +378,7 @@ export const UserProfile = () => {
                     </div>
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <div className="text-3xl font-bold text-green-600 mb-1">
-                        2,847
+                        {mentorStats?.totalLearners ?? 2847}
                       </div>
                       <div className="text-sm text-gray-600">
                         Total Students
@@ -370,7 +386,7 @@ export const UserProfile = () => {
                     </div>
                     {/* <div className="text-center p-4 bg-amber-50 rounded-lg">
                       <div className="text-3xl font-bold text-amber-600 mb-1">
-                        4.9
+                        {currentProfile?.rating ?? 4.9}
                       </div>
                       <div className="text-sm text-gray-600">
                         Average Rating

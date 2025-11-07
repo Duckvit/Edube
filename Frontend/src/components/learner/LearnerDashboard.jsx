@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { getAllCourses } from "../../apis/CourseServices";
 import { createPayment } from "../../apis/PaymentServices";
-import { getEnrollmentsByLearner, createFreeEnrollments } from "../../apis/EnrollmentServices";
+import {
+  getEnrollmentsByLearner,
+  createFreeEnrollments,
+} from "../../apis/EnrollmentServices";
+import { getLessonProgressByEnrollment } from "../../apis/LessonProgressServices";
 import { toast } from "react-toastify";
 import {
   Card,
@@ -82,59 +86,90 @@ export const LearnerDashboard = () => {
     fetchAllCourses();
   }, []);
 
-  useEffect(() => {
-    const fetchEnrollCourses = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const learnerId = userData?.learner.id;
-        console.log("userData", userData)
-        if (!token || !learnerId) {
-          setError("Thiếu token hoặc learnerId");
-          return;
-        }
-
-        setLoading(true);
-        const data = await getEnrollmentsByLearner(learnerId, token);
-        console.log("📘 Enrolled Courses API response:", data);
-
-        // Dữ liệu API trả về là 1 array chứa enrollments
-        const enrollments = Array.isArray(data)
-          ? data
-          : data?.content || data?.data || [];
-
-        // ✅ Map để lấy ra thông tin course trong từng enrollment
-        const mappedCourses = enrollments.map((enroll) => {
-          const c = enroll.course;
-          return {
-            enrollmentId: enroll.id,
-            id: c.id,
-            title: c.title || "Untitled Course",
-            mentor: c.mentor?.user?.fullName || "Unknown",
-            category: c.category || "General",
-            level: c.level || "All",
-            price: c.price || 0,
-            students: c.totalStudents || 0,
-            duration: c.durationHours ? `${c.durationHours}h` : "",
-            lessons: c.totalLessons || 0,
-            thumbnail: c.thumbnail || c.image || null,
-            progress: enroll.progressPercentage || 0,
-            status: enroll.status,
-            enrolledAt: enroll.enrollmentDate,
-          };
-        });
-
-        setEnrolledCourses(mappedCourses);
-        console.log("✅ mapped enrolled courses:", mappedCourses);
-      } catch (err) {
-        console.error("Lỗi khi gọi API Enrolled Courses:", err);
-        setError(err.message || "Đã xảy ra lỗi");
-      } finally {
-        setLoading(false);
+  // fetch enrollments and map them to component state; exported so other handlers can call
+  const fetchEnrollCourses = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const learnerId = userData?.learner?.id;
+      console.log("userData", userData);
+      if (!token || !learnerId) {
+        setError("Thiếu token hoặc learnerId");
+        return;
       }
-    };
 
+      setLoading(true);
+      const data = await getEnrollmentsByLearner(learnerId, token);
+      console.log("📘 Enrolled Courses API response:", data);
+
+      // Dữ liệu API trả về là 1 array chứa enrollments
+      const enrollments = Array.isArray(data)
+        ? data
+        : data?.content || data?.data || [];
+
+      // get completed counts for each enrollment in parallel
+      const completedCounts = await Promise.all(
+        enrollments.map(async (enroll) => {
+          try {
+            const lp = await getLessonProgressByEnrollment(enroll.id, token);
+            const list = Array.isArray(lp) ? lp : lp?.content || lp?.data || [];
+            return list.filter((p) => p.completed === true).length;
+          } catch (e) {
+            // fallback to any server-provided field
+            return enroll.completedLessons || 0;
+          }
+        })
+      );
+
+      // ✅ Map để lấy ra thông tin course trong từng enrollment
+      const mappedCourses = enrollments.map((enroll, idx) => {
+        const c = enroll.course;
+        // normalize server status values to FE-friendly ones
+        const rawStatus = String(enroll.status || "").toLowerCase();
+        const status = rawStatus === "active" ? "in-progress" : rawStatus;
+        return {
+          enrollmentId: enroll.id,
+          id: c.id,
+          title: c.title || "Untitled Course",
+          mentor: c.mentor?.user?.fullName || "Unknown",
+          category: c.category || "General",
+          level: c.level || "All",
+          price: c.price || 0,
+          students: c.totalStudents || 0,
+          duration: c.durationHours ? `${c.durationHours}h` : "",
+          lessons: c.totalLessons || 0,
+          thumbnail: c.thumbnail || c.image || null,
+          completedLessons:
+            completedCounts[idx] || enroll.completedLessons || 0,
+          progress: enroll.progressPercentage || 0,
+          status: status,
+          enrolledAt: enroll.enrollmentDate,
+        };
+      });
+
+      setEnrolledCourses(mappedCourses);
+      console.log("✅ mapped enrolled courses:", mappedCourses);
+    } catch (err) {
+      console.error("Lỗi khi gọi API Enrolled Courses:", err);
+      setError(err.message || "Đã xảy ra lỗi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // initial load
     fetchEnrollCourses();
-  }, []);
+
+    // listen to enrollment changes from other parts of the app (CourseDetail)
+    const handler = (e) => {
+      console.log("Received enrollment:updated event", e?.detail);
+      fetchEnrollCourses();
+    };
+    window.addEventListener("enrollment:updated", handler);
+    return () => {
+      window.removeEventListener("enrollment:updated", handler);
+    };
+  }, [userData]);
 
   const handleEnroll = async (courseId) => {
     try {
@@ -200,6 +235,7 @@ export const LearnerDashboard = () => {
     return true;
   });
 
+  console.log("📘 Filtered enrolled courses:", filteredEnrolledCourses);
   const filteredAllCourses = useMemo(() => {
     return allCourses.filter((course) => {
       const matchesSearch =
@@ -334,10 +370,10 @@ export const LearnerDashboard = () => {
                     ({course.rating})
                   </span>
                 </div> */}
-                <div className="text-sm text-gray-600 mb-3">
+                {/* <div className="text-sm text-gray-600 mb-3">
                   {enroll.completedLessons || 0}/{enroll.lessons} lessons •{" "}
                   {enroll.duration}
-                </div>
+                </div> */}
                 <div className="mb-3" style={{ minHeight: "52px" }}>
                   {enroll.status !== "saved" && (
                     <div>

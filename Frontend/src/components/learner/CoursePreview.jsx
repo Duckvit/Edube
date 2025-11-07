@@ -12,6 +12,7 @@ import {
   PlayCircleOutlined,
   LockOutlined,
   ArrowLeftOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import useAiStore from "../../store/useAiStore";
 import { useUserStore } from "../../store/useUserStore";
@@ -267,12 +268,15 @@ const CoursePreview = () => {
                           sIdx === 0 &&
                           lIdx === 0 &&
                           (lesson.contentUrl || lesson.contentText);
+                        const isSelected = selectedLesson?.id === lesson.id;
 
                         return (
                           <List.Item
-                            className={`px-2 py-3 rounded ${
+                            className={`px-2 py-3 rounded transition-colors ${
                               !isPlayable
                                 ? "opacity-60 cursor-default"
+                                : isSelected
+                                ? "bg-blue-50 border-l-4 border-blue-500 cursor-pointer"
                                 : "hover:bg-gray-50 cursor-pointer"
                             }`}
                             onClick={() => {
@@ -282,10 +286,12 @@ const CoursePreview = () => {
                             }}
                           >
                             <div className="flex items-center space-x-3">
-                              {isPlayable ? (
+                              {!isPlayable ? (
+                                <LockOutlined className="text-gray-400" />
+                              ) : lesson.contentType === "video" ? (
                                 <PlayCircleOutlined className="text-blue-500" />
                               ) : (
-                                <LockOutlined className="text-gray-400" />
+                                <FileTextOutlined className="text-green-600" />
                               )}
                               <div>
                                 <div className="font-medium text-sm">

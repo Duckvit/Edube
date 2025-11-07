@@ -120,10 +120,8 @@ const CourseDetail = () => {
               const token = localStorage.getItem("token");
               if (token) {
                 try {
-                  const lessonProgressList = await getLessonProgressByEnrollment(
-                    match.id,
-                    token
-                  );
+                  const lessonProgressList =
+                    await getLessonProgressByEnrollment(match.id, token);
                   // Create a map of lessonId -> progress
                   const progressMap = new Map();
                   if (Array.isArray(lessonProgressList)) {
@@ -158,7 +156,7 @@ const CourseDetail = () => {
             (acc, s) => acc + (s.lessons?.length || 0),
             0
           );
-        
+
         // Build curriculum with completed status
         // Note: lessonProgressMap will be set asynchronously, so we'll update it in a separate effect
         let assigned = 0;
@@ -171,7 +169,7 @@ const CourseDetail = () => {
             const completedFromProgress =
               progress?.isCompleted === true ||
               (progress?.completionPercentage ?? 0) >= 100;
-            
+
             // Fallback to enrollment progress if lesson progress not available
             const completedCount = Math.round(
               ((progressPercentage || 0) / 100) * (totalLessons || 1)
@@ -179,7 +177,7 @@ const CourseDetail = () => {
             const completed =
               completedFromProgress || assigned < completedCount;
             assigned += 1;
-            
+
             return {
               ...lesson,
               locked: false,
@@ -188,7 +186,7 @@ const CourseDetail = () => {
           });
           return { ...section, lessons };
         });
-        
+
         // Count actual completed lessons
         let completedCount = 0;
         curriculum.forEach((section) => {
@@ -196,10 +194,12 @@ const CourseDetail = () => {
             if (lesson.completed) completedCount++;
           });
         });
-        
+
         // Update progress percentage based on actual completed lessons if we have lesson progress data
         if (lessonProgressMap.size > 0 && totalLessons > 0) {
-          progressPercentage = Math.round((completedCount / totalLessons) * 100);
+          progressPercentage = Math.round(
+            (completedCount / totalLessons) * 100
+          );
         }
 
         mapped.curriculum = curriculum;
@@ -409,7 +409,7 @@ const CourseDetail = () => {
   // Function to refresh lesson progress and update course curriculum
   const refreshLessonProgressData = useCallback(async () => {
     if (!enrollmentId) return;
-    
+
     const token = localStorage.getItem("token");
     if (!token) return;
 
@@ -423,20 +423,18 @@ const CourseDetail = () => {
       if (Array.isArray(lessonProgressList)) {
         lessonProgressList.forEach((progress) => {
           const lessonId =
-            progress.lesson?.id ||
-            progress.lessonId ||
-            progress.lesson;
+            progress.lesson?.id || progress.lessonId || progress.lesson;
           if (lessonId) {
             progressMap.set(lessonId, progress);
           }
         });
       }
       setLessonProgressMap(progressMap);
-      
+
       // Update course curriculum with actual lesson progress
       setCourse((prevCourse) => {
         if (!prevCourse || !prevCourse.curriculum) return prevCourse;
-        
+
         const updated = { ...prevCourse };
         const curriculum = (updated.curriculum || []).map((section) => {
           const lessons = (section.lessons || []).map((lesson) => {
@@ -446,7 +444,7 @@ const CourseDetail = () => {
             const completed =
               progress?.isCompleted === true ||
               (progress?.completionPercentage ?? 0) >= 100;
-            
+
             return {
               ...lesson,
               completed,
@@ -455,7 +453,7 @@ const CourseDetail = () => {
           });
           return { ...section, lessons };
         });
-        
+
         // Count actual completed lessons
         let completedCount = 0;
         curriculum.forEach((section) => {
@@ -463,17 +461,17 @@ const CourseDetail = () => {
             if (lesson.completed) completedCount++;
           });
         });
-        
+
         updated.curriculum = curriculum;
         updated.completedLessons = completedCount;
-        
+
         const totalLessons =
           updated.totalLessons ||
           curriculum.reduce((acc, s) => acc + (s.lessons?.length || 0), 0);
         if (totalLessons > 0) {
           updated.progress = Math.round((completedCount / totalLessons) * 100);
         }
-        
+
         return updated;
       });
     } catch (err) {
@@ -547,6 +545,43 @@ const CourseDetail = () => {
     } catch (err) {
       // ignore
     }
+  };
+
+  // Helper function to determine content type
+  const getContentType = (lesson) => {
+    if (!lesson) return null;
+
+    // First check if contentType is explicitly set
+    if (lesson.contentType) {
+      return lesson.contentType.toLowerCase();
+    }
+
+    // Check contentUrl to determine type
+    const url = lesson.contentUrl;
+    if (url) {
+      const lower = String(url).toLowerCase();
+      const isVideo = /\.(mp4|webm|ogg|m3u8|mpd)(\?.*)?$/.test(lower);
+      const isPdf = /\.pdf(\?.*)?$/.test(lower);
+      const isDoc = /\.(docx?|pptx?|xlsx?)(\?.*)?$/.test(lower);
+
+      if (isVideo) return "video";
+      if (isPdf) return "pdf";
+      if (isDoc) return "doc";
+      return "other";
+    }
+
+    // Check contentText
+    if (lesson.contentText) {
+      return "reading";
+    }
+
+    return null;
+  };
+
+  // Handle mark as read for documents
+  const handleMarkAsRead = async () => {
+    if (!selectedLesson || selectedLesson.completed) return;
+    await completeCurrentLesson();
   };
 
   // Render lesson content based on its contentUrl or contentText
@@ -1117,35 +1152,36 @@ const CourseDetail = () => {
                                   }
                                 }}
                               >
-                              <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center space-x-3">
-                                  {lesson.locked ? (
-                                    <LockOutlined className="text-gray-400" />
-                                  ) : lesson.completed ? (
-                                    <CheckCircleOutlined className="text-green-500" />
-                                  ) : lesson.contentType === "video" ? (
-                                    <PlayCircleOutlined className="text-blue-500" />
-                                  ) : (
-                                    <FileTextOutlined className="text-green-600" />
-                                  )}
-                                  <div>
-                                    <div className="font-medium text-sm">
-                                      {lesson.title}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {lesson.duration}
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center space-x-3">
+                                    {lesson.locked ? (
+                                      <LockOutlined className="text-gray-400" />
+                                    ) : lesson.completed ? (
+                                      <CheckCircleOutlined className="text-green-500" />
+                                    ) : lesson.contentType === "video" ? (
+                                      <PlayCircleOutlined className="text-blue-500" />
+                                    ) : (
+                                      <FileTextOutlined className="text-green-600" />
+                                    )}
+                                    <div>
+                                      <div className="font-medium text-sm">
+                                        {lesson.title}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {lesson.duration}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            </List.Item>
+                              </List.Item>
                             );
                           }}
-        />
-      </div>
-    ),
-  }))}
-/>
+                        />
+                      </div>
+                    ),
+                  })
+                )}
+              />
             </Card>
           </div>
         </div>

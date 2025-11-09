@@ -13,10 +13,12 @@ import {
   LockOutlined,
   ArrowLeftOutlined,
   FileTextOutlined,
+  MessageOutlined,
 } from "@ant-design/icons";
 import useAiStore from "../../store/useAiStore";
 import { useUserStore } from "../../store/useUserStore";
 import { getCourseById as fetchCourseById } from "../../apis/CourseServices";
+import path from "../../utils/path";
 
 const { Panel } = Collapse;
 
@@ -173,7 +175,52 @@ const CoursePreview = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {course.title}
               </h1>
-              <p className="text-gray-600 mb-4">by {course.mentor}</p>
+              <div className="flex items-center gap-3 mb-4">
+                <p className="text-gray-600">by {course.mentor}</p>
+                {course.mentorId && (
+                  <Button
+                    type="primary"
+                    icon={<MessageOutlined />}
+                    size="small"
+                    className="!bg-blue-600 hover:!bg-blue-700"
+                    onClick={async () => {
+                      try {
+                        const token = localStorage.getItem("token");
+                        if (!token) {
+                          toast.error("Please log in to chat");
+                          return;
+                        }
+
+                        const userId =
+                          useUserStore.getState().userData?.learner?.id ||
+                          Number(localStorage.getItem("userId")) ||
+                          1;
+
+                        // Tạo conversation nếu chưa có
+                        try {
+                          await createConversation({
+                            learner: { id: userId },
+                            mentor: { id: course.mentorId },
+                            course: { id: course.id },
+                            title: course.title || "Hỏi về khóa học",
+                          });
+                        } catch (err) {
+                          // Conversation có thể đã tồn tại, tiếp tục navigate
+                          console.log("Conversation may already exist:", err);
+                        }
+
+                        // Navigate đến trang chat
+                        navigate(`/${path.PUBLIC_LEARNER}/${path.USER_CHAT}`);
+                      } catch (error) {
+                        console.error("Error navigating to chat:", error);
+                        toast.error("Failed to open chat");
+                      }
+                    }}
+                  >
+                    Chat
+                  </Button>
+                )}
+              </div>
               <div className="flex items-center space-x-6 text-sm text-gray-600">
                 {/* <div className="flex items-center">
                   <Rate

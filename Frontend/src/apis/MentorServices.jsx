@@ -24,3 +24,9 @@ export const getLearner = async (page = 0, size = 10, mentorId, token) => {
   });
   return res.data;
 };
+
+export const getAllMentors = async(token) => {
+  const res = await axiosConfig.get(`/api/mentors`, {
+    
+  })
+}

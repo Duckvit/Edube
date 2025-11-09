@@ -20,6 +20,7 @@ import {
   DownloadOutlined,
   LockOutlined,
   ArrowLeftOutlined,
+  MessageOutlined,
 } from "@ant-design/icons";
 import { getCourseById } from "../../apis/CourseServices";
 import {
@@ -35,6 +36,9 @@ import {
 } from "../../apis/LessonProgressServices";
 import { useUserStore } from "../../store/useUserStore";
 import useAiStore from "../../store/useAiStore";
+import { createConversation } from "../../apis/ChatServices";
+import { toast } from "react-toastify";
+import path from "../../utils/path";
 
 const { TextArea } = Input;
 const { Title, Paragraph } = Typography;
@@ -76,6 +80,7 @@ const CourseDetail = () => {
           id: c.id || c.courseId || c._id || courseId,
           title: c.title || c.name || "Untitled Course",
           instructor: c.instructor || c.mentor?.user?.fullName || "Unknown",
+          mentorId: c.mentor?.id || null,
           description: c.description || c.summary || c.overview || "",
           rating: c.rating || 5,
           students: c.totalStudents ?? 0,
@@ -260,17 +265,63 @@ const CourseDetail = () => {
       </Card>
 
       <Card title="Instructor">
-        <div className="flex items-center space-x-4">
-          <Avatar
-            size={64}
-            icon={<UserOutlined />}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 !mr-3"
-          />
-          <div>
-            <h3 className="text-lg font-semibold">{course.instructor}</h3>
-            <p className="text-gray-600">Senior Software Engineer & Educator</p>
-            {/* <Rate disabled defaultValue={5} className="text-sm mt-1" /> */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Avatar
+              size={64}
+              icon={<UserOutlined />}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 !mr-3"
+            />
+            <div>
+              <h3 className="text-lg font-semibold">{course.instructor}</h3>
+              <p className="text-gray-600">Senior Software Engineer & Educator</p>
+              {/* <Rate disabled defaultValue={5} className="text-sm mt-1" /> */}
+            </div>
           </div>
+          {course.mentorId && (
+            <Button
+              type="primary"
+              icon={<MessageOutlined />}
+              className="!bg-blue-600 hover:!bg-blue-700"
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem("token");
+                  if (!token) {
+                    toast.error("Please log in to chat");
+                    return;
+                  }
+
+                  const userId =
+                    userData?.learner?.id ||
+                    useUserStore.getState().userData?.learner?.id ||
+                    useUserStore.getState().userData?.id ||
+                    Number(localStorage.getItem("userId")) ||
+                    1;
+
+                  // Tạo conversation nếu chưa có
+                  try {
+                    await createConversation({
+                      learner: { id: userId },
+                      mentor: { id: course.mentorId },
+                      course: { id: course.id },
+                      title: course.title || "Hỏi về khóa học",
+                    });
+                  } catch (err) {
+                    // Conversation có thể đã tồn tại, tiếp tục navigate
+                    console.log("Conversation may already exist:", err);
+                  }
+
+                  // Navigate đến trang chat
+                  navigate(`/${path.PUBLIC_LEARNER}/${path.USER_CHAT}`);
+                } catch (error) {
+                  console.error("Error navigating to chat:", error);
+                  toast.error("Failed to open chat");
+                }
+              }}
+            >
+              Chat
+            </Button>
+          )}
         </div>
       </Card>
     </div>
@@ -993,7 +1044,54 @@ const CourseDetail = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {course.title}
               </h1>
-              <p className="text-gray-600 mb-4">by {course.instructor}</p>
+              <div className="flex items-center gap-3 mb-4">
+                <p className="text-gray-600">by {course.instructor}</p>
+                {course.mentorId && (
+                  <Button
+                    type="primary"
+                    icon={<MessageOutlined />}
+                    size="small"
+                    className="!bg-blue-600 hover:!bg-blue-700"
+                    onClick={async () => {
+                      try {
+                        const token = localStorage.getItem("token");
+                        if (!token) {
+                          toast.error("Please log in to chat");
+                          return;
+                        }
+
+                        const userId =
+                          userData?.learner?.id ||
+                          useUserStore.getState().userData?.learner?.id ||
+                          useUserStore.getState().userData?.id ||
+                          Number(localStorage.getItem("userId")) ||
+                          1;
+
+                        // Tạo conversation nếu chưa có
+                        try {
+                          await createConversation({
+                            learner: { id: userId },
+                            mentor: { id: course.mentorId },
+                            course: { id: course.id },
+                            title: course.title || "Hỏi về khóa học",
+                          });
+                        } catch (err) {
+                          // Conversation có thể đã tồn tại, tiếp tục navigate
+                          console.log("Conversation may already exist:", err);
+                        }
+
+                        // Navigate đến trang chat
+                        navigate(`/${path.PUBLIC_LEARNER}/${path.USER_CHAT}`);
+                      } catch (error) {
+                        console.error("Error navigating to chat:", error);
+                        toast.error("Failed to open chat");
+                      }
+                    }}
+                  >
+                    Chat
+                  </Button>
+                )}
+              </div>
               <div className="flex items-center space-x-6 text-sm text-gray-600">
                 {/* <div className="flex items-center">
                   <Rate

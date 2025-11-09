@@ -75,8 +75,13 @@ const CourseManagement = () => {
   const handleActiveCourse = async (id) => {
     try {
       const token = localStorage.getItem("token");
-      await activeCourse(id, token);
+      await activeCourse(token, id);
       toast.success("Active Course successfully!");
+      // Refresh data after successful activation
+      const data = await getAllCourses(currentPage - 1, pageSize, token);
+      const coursesData = data?.content || [];
+      setAllCourses(coursesData);
+      setTotalItems(data?.totalElements || data?.total || 0);
     } catch (err) {
       console.error("Lỗi khi kích hoạt:", err);
       toast.error("Active Course failed!");
@@ -207,13 +212,14 @@ const CourseManagement = () => {
         <div className="flex flex-col gap-2">
           <Button
             className="!bg-blue-500 !text-white w-full"
-            onClick={() => {
+            onClick={(e) => {
               e.stopPropagation(); // ngăn click lan ra hàng
               handleActiveCourse(record.id);
             }}
             style={{ marginRight: "10px" }}
+            disabled={record.status === "active"}
           >
-            Active
+            {record.status === "active" ? "Active" : "Approve"}
           </Button>
           <Button
             className="!bg-red-500 !text-white !w-full"

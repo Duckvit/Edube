@@ -1,25 +1,135 @@
 import React, { useState, useEffect } from "react";
 import Loading from "../common/Loading";
 import "chart.js/auto";
-import { Bar, Pie } from "react-chartjs-2";
-import { Card, Row, Col, Statistic, Progress, Table, Tag } from "antd";
+import { Pie } from "react-chartjs-2";
+import { Card, Table, Tag } from "antd";
 import {
   UserOutlined,
   BookOutlined,
   ClockCircleOutlined,
   DollarOutlined,
-  RiseOutlined,
-  EyeOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
-  FileTextOutlined,
+  TeamOutlined,
+  TrophyOutlined,
 } from "@ant-design/icons";
-import { BookOpen, Users, TrendingUp, Star, Clock } from "lucide-react";
+import { BookOpen, Users, TrendingUp } from "lucide-react";
+import { getAllCourses } from "../../apis/CourseServices";
+import { formatDate } from "../../utils/formatDate";
 
 export const AdminHome = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [insructorRatings, setInsructorRatings] = useState([]);
+  
+  // Statistics state
+  const [statistics, setStatistics] = useState({
+    totalCourses: 0,
+    activeCourses: 0,
+    inactiveCourses: 0,
+    totalLearners: 0,
+    totalMentors: 0,
+    totalUsers: 0,
+    totalRevenue: 0,
+  });
+  
+  const [allCourses, setAllCourses] = useState([]);
+  const [topCourses, setTopCourses] = useState([]);
+  const [courseStatusData, setCourseStatusData] = useState({ active: 0, inactive: 0 });
+  const [recentActivities, setRecentActivities] = useState([]);
+
+  // Fetch all courses and calculate statistics
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setError("Token không tồn tại");
+          return;
+        }
+
+        // Fetch all courses (get a large number to calculate stats)
+        const coursesResponse = await getAllCourses(0, 1000, token);
+        const courses = coursesResponse?.content || [];
+        setAllCourses(courses);
+
+        // Calculate statistics
+        const totalCourses = courses.length;
+        const activeCourses = courses.filter(c => c.status === "active").length;
+        const inactiveCourses = courses.filter(c => c.status === "inactive").length;
+
+        // Get unique mentors
+        const uniqueMentors = new Set(courses.map(c => c.mentor?.id).filter(Boolean));
+        const totalMentors = uniqueMentors.size;
+
+        // Calculate total students (sum of totalStudents from all courses)
+        const totalLearners = courses.reduce((sum, course) => sum + (course.totalStudents || 0), 0);
+
+        // Calculate revenue (sum of price * totalStudents, assuming all enrolled students paid)
+        const totalRevenue = courses.reduce((sum, course) => {
+          const revenue = (course.price || 0) * (course.totalStudents || 0);
+          return sum + revenue;
+        }, 0);
+
+        // Get unique learners (this is approximate - actual count would need API)
+        // For now, we'll use totalStudents as approximation
+        const estimatedTotalUsers = totalMentors + totalLearners;
+
+        setStatistics({
+          totalCourses,
+          activeCourses,
+          inactiveCourses,
+          totalLearners: Math.max(totalLearners, estimatedTotalUsers - totalMentors),
+          totalMentors,
+          totalUsers: estimatedTotalUsers,
+          totalRevenue,
+        });
+
+        // Calculate course status distribution (only active and inactive)
+        setCourseStatusData({
+          active: activeCourses,
+          inactive: inactiveCourses,
+        });
+
+        // Get top courses by enrollment (totalStudents)
+        const sortedCourses = [...courses]
+          .sort((a, b) => (b.totalStudents || 0) - (a.totalStudents || 0))
+          .slice(0, 5)
+          .map((course, index) => ({
+            key: String(index + 1),
+            title: course.title,
+            mentor: course.mentor?.user?.fullName || "Unknown",
+            students: course.totalStudents || 0,
+            revenue: (course.price || 0) * (course.totalStudents || 0),
+            status: course.status,
+          }));
+        setTopCourses(sortedCourses);
+
+        // Generate recent activities from courses
+        const activities = courses
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          .slice(0, 5)
+          .map((course, index) => ({
+            key: String(index + 1),
+            action: course.status === "active"
+              ? "Course Active"
+              : "Course Created",
+            user: course.mentor?.user?.fullName || "Unknown",
+            time: formatDate(course.createdAt),
+            status: course.status === "active" ? "success" : "pending",
+          }));
+        setRecentActivities(activities);
+
+      } catch (err) {
+        console.error("Lỗi khi fetch dashboard data:", err);
+        setError(err.message || "Đã xảy ra lỗi");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   const activityColumns = [
     {
@@ -67,126 +177,71 @@ export const AdminHome = () => {
     },
   ];
 
-  const recentActivities = [
-    {
-      key: "1",
-      action: "New User Registration",
-      user: "John Smith",
-      time: "2 minutes ago",
-      status: "success",
-    },
-    {
-      key: "2",
-      action: "Course Submitted for Review",
-      user: "Dr. Sarah Chen",
-      time: "15 minutes ago",
-      status: "pending",
-    },
-    {
-      key: "3",
-      action: "Course Approved",
-      user: "Prof. Michael Rodriguez",
-      time: "1 hour ago",
-      status: "success",
-    },
-    {
-      key: "4",
-      action: "Payment Processed",
-      user: "Emma Wilson",
-      time: "2 hours ago",
-      status: "success",
-    },
-    {
-      key: "5",
-      action: "Course Rejected",
-      user: "Alex Kumar",
-      time: "3 hours ago",
-      status: "error",
-    },
-  ];
 
-  const roundStarRating = (rating) => {
-    if (rating < 1.25) return 1;
-    if (rating < 2.25) return 2;
-    if (rating < 3.25) return 3;
-    if (rating < 4.25) return 4;
-    return 5;
-  };
-
-  const starCounts = insructorRatings.reduce(
-    (acc, rating) => {
-      const star = roundStarRating(rating);
-      acc[star - 1] += 1; // -1 vì mảng acc bắt đầu từ index 0
-      return acc;
-    },
-    // [0, 0, 0, 0, 0]
-    [21, 2, 50, 20, 66]
-  );
-
-  const barData = {
-    labels: ["1 Star", "2 Stars", "3 Stars", "4 Stars", "5 Stars"],
-    datasets: [
-      {
-        label: "Number of Mentor",
-        backgroundColor: "#4F46E5",
-        borderColor: "#3730A3",
-        borderWidth: 1,
-        hoverBackgroundColor: "#4338CA",
-        hoverBorderColor: "#3730A3",
-        data: starCounts,
-      },
-    ],
-  };
-
-  const barOptions = {
-    maintainAspectRatio: false,
-    scales: {
-      x: {
-        title: {
-          display: true,
-          text: "Stars",
-          font: {
-            size: 16,
-            weight: "bold",
-            family: "Arial, sans-serif",
-          },
-        },
-        beginAtZero: true,
-      },
-      y: {
-        title: {
-          display: true,
-          text: "Number of Mentors",
-          font: {
-            size: 16,
-            weight: "bold",
-            family: "Arial, sans-serif",
-          },
-        },
-        beginAtZero: true,
-        ticks: {
-          stepSize: 5,
-        },
-      },
-    },
-  };
 
   const pieOptions = {
     maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          padding: 15,
+          font: {
+            size: 12,
+            weight: 'bold',
+          },
+          usePointStyle: true,
+        },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        padding: 10,
+        titleFont: {
+          size: 14,
+        },
+        bodyFont: {
+          size: 12,
+        },
+        callbacks: {
+          label: function(context) {
+            const label = context.label || '';
+            const value = context.parsed || 0;
+            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+            return `${label}: ${value} (${percentage}%)`;
+          }
+        }
+      },
+    },
   };
   const pieData = {
-    labels: ["Approved ", "Rejected", "Pending"],
+    labels: ["Active", "Inactive"],
     datasets: [
       {
-        data: [2, 3, 4],
-        backgroundColor: ["#10B981", "#EF4444", "#F59E0B"],
-        hoverBackgroundColor: ["#059669", "#DC2626", "#D97706"],
+        data: [
+          courseStatusData.active,
+          courseStatusData.inactive,
+        ],
+        backgroundColor: ["#10B981", "#F59E0B"],
+        hoverBackgroundColor: ["#059669", "#D97706"],
       },
     ],
   };
 
+  const totalCourseStatus = courseStatusData.active + courseStatusData.inactive;
+
   if (error) {
-    return <div className="text-center text-red-500">{error}</div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 p-6 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ExclamationCircleOutlined className="text-3xl text-red-500" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">Error</h3>
+          <p className="text-red-500">{error}</p>
+        </div>
+      </div>
+    );
   }
 
   const coursesColumns = [
@@ -195,9 +250,12 @@ export const AdminHome = () => {
       dataIndex: "title",
       key: "title",
       render: (title, record) => (
-        <div>
-          <div className="font-medium">{title}</div>
-          <div className="text-sm text-gray-500">by {record.mentor}</div>
+        <div className="py-2">
+          <div className="font-semibold text-gray-800 text-sm mb-1">{title}</div>
+          <div className="text-xs text-gray-500 flex items-center">
+            <UserOutlined className="mr-1" />
+            {record.mentor}
+          </div>
         </div>
       ),
     },
@@ -205,109 +263,57 @@ export const AdminHome = () => {
       title: "Students",
       dataIndex: "students",
       key: "students",
-      render: (students) => students.toLocaleString(),
+      render: (students) => (
+        <div className="flex items-center">
+          <TeamOutlined className="mr-2 text-blue-500" />
+          <span className="font-semibold">{students.toLocaleString()}</span>
+        </div>
+      ),
     },
     {
       title: "Revenue",
       dataIndex: "revenue",
       key: "revenue",
       render: (revenue) => (
-        <span className="font-semibold text-green-600">
-          ${revenue.toLocaleString()}
+        <span className="font-bold text-green-600">
+          {new Intl.NumberFormat("vi-VN").format(revenue)} VNĐ
         </span>
       ),
     },
-    {
-      title: "Rating",
-      dataIndex: "rating",
-      key: "rating",
-      render: (rating) => (
-        <div className="flex items-center">
-          {rating}
-          <span className="ml-1">⭐</span>
-        </div>
-      ),
-    },
-    {
-      title: "Completion Rate",
-      dataIndex: "completion",
-      key: "completion",
-      render: (completion) => <Progress percent={completion} size="small" />,
-    },
   ];
 
-  const topCoursesData = [
-    {
-      key: "1",
-      title: "Advanced React Development",
-      mentor: "Dr. Sarah Chen",
-      students: 1247,
-      revenue: 12470,
-      rating: 4.9,
-      completion: 87,
-    },
-    {
-      key: "2",
-      title: "Python for Beginners",
-      mentor: "David Park",
-      students: 2103,
-      revenue: 12618,
-      rating: 4.7,
-      completion: 92,
-    },
-    {
-      key: "3",
-      title: "Data Analysis with Excel",
-      mentor: "Maria Garcia",
-      students: 1456,
-      revenue: 10192,
-      rating: 4.6,
-      completion: 89,
-    },
-    {
-      key: "4",
-      title: "Machine Learning Fundamentals",
-      mentor: "Prof. Michael Rodriguez",
-      students: 856,
-      revenue: 12840,
-      rating: 4.8,
-      completion: 78,
-    },
-    {
-      key: "5",
-      title: "Digital Marketing Strategy",
-      mentor: "Lisa Thompson",
-      students: 743,
-      revenue: 5944,
-      rating: 4.5,
-      completion: 85,
-    },
-  ];
 
   return (
-    <div className="bg-gray-100  rounded-lg shadow-lg m-2">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 p-6">
       {loading && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white bg-opacity-70">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white bg-opacity-80 backdrop-blur-sm">
           <Loading />
         </div>
       )}
-      {/* <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Admin Dashboard
-          </h1>
-          <p className="text-gray-600">
-            Overview of platform statistics and recent activities
-          </p>
-        </div> */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      
+      {/* Header Section */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+          Admin Dashboard
+        </h1>
+        <p className="text-gray-600 text-lg">
+          Overview of platform statistics and recent activities
+        </p>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {/* Total Users Card */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Users</p>
-              <p className="text-3xl font-bold text-gray-900"></p>
-              <p className="text-sm text-green-600 flex items-center mt-1">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                +12% from last month
+              <p className="text-3xl font-bold text-gray-900">
+                {statistics.totalUsers.toLocaleString()}
+              </p>
+              <p className="text-sm text-gray-500 flex items-center mt-1">
+                <TeamOutlined className="w-4 h-4 mr-1" />
+                {statistics.totalMentors} mentors, {statistics.totalLearners} learners
               </p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -316,16 +322,19 @@ export const AdminHome = () => {
           </div>
         </div>
 
+        {/* Total Courses Card */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">
-                Active Courses
+                Total Courses
               </p>
-              <p className="text-3xl font-bold text-gray-900"></p>
+              <p className="text-3xl font-bold text-gray-900">
+                {statistics.totalCourses}
+              </p>
               <p className="text-sm text-green-600 flex items-center mt-1">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                +3 new this month
+                <CheckCircleOutlined className="w-4 h-4 mr-1" />
+                {statistics.activeCourses} active
               </p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -334,32 +343,17 @@ export const AdminHome = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">
-                Pending Approvals
-              </p>
-              <p className="text-3xl font-bold text-gray-900"></p>
-              <p className="text-sm text-yellow-600 flex items-center mt-1">
-                <ClockCircleOutlined className="w-4 h-4 mr-1 fill-current" />
-                24 course recently
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-6 h-6 text-yellow-600" />
-            </div>
-          </div>
-        </div>
-
+        {/* Total Revenue Card */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-              <p className="text-3xl font-bold text-gray-900">$</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {new Intl.NumberFormat("vi-VN").format(statistics.totalRevenue)} VNĐ
+              </p>
               <p className="text-sm text-green-600 flex items-center mt-1">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                +8% from last month
+                <DollarOutlined className="w-4 h-4 mr-1" />
+                Estimated from enrollments
               </p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -369,60 +363,130 @@ export const AdminHome = () => {
         </div>
       </div>
 
-      <div className="flex gap-2 h-3/5 mt-3">
-        <div className=" bg-white p-3 rounded-lg shadow-2xl col-span-2 w-7/12">
-          <h2 className="text-2xl font-semibold mb-4 text-center text-gray-700">
-            Mentor Ratings
-          </h2>
-          <div style={{ height: "300px" }}>
-            <Bar data={barData} options={barOptions} />
-          </div>
-        </div>
-
-        <div className="bg-white p-3 rounded-lg shadow-2xl col-span-1 w-5/12">
-          <h2 className="text-2xl font-semibold mb-4 text-center text-gray-700">
-            Approve Status
-          </h2>
-          <div style={{ height: "250px" }}>
-            <Pie data={pieData} options={pieOptions} />
-          </div>
-          <ul className="mt-4 grid grid-cols-3 text-center">
-            <li className="text-green-600 font-medium">
-              {/* Accepted: {bookingStatus.CONFIRMED > 0 ? ((bookingStatus.CONFIRMED / totalBookings) * 100).toFixed(2) : 0} */}
-              60%
-            </li>
-            <li className="text-red-600 font-medium">
-              {/* Rejected: {bookingStatus.CONFIRMED > 0 ? ((bookingStatus.REJECTED / totalBookings) * 100).toFixed(2) : 0} */}
-              30%
-            </li>
-            <li className="text-yellow-600 font-medium">
-              {/* Pending: {bookingStatus.CONFIRMED > 0 ? ((bookingStatus.PENDING / totalBookings) * 100).toFixed(2) : 0}% */}
-              20%
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      {/* Recent Activities */}
-      <Row gutter={[16, 16]} className="mt-3">
-        <Col span={24}>
+      {/* Chart and Tables Section */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Top Performing Courses */}
+        <div className="lg:col-span-2">
           <Card
+            className="shadow-xl border-0 rounded-2xl"
             title={
               <div className="flex items-center">
-                <FileTextOutlined className="mr-2" />
-                Top Performing Courses
+                <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center mr-3">
+                  <TrophyOutlined className="text-white text-lg" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 m-0">Top Performing Courses</h3>
+                  <p className="text-xs text-gray-500 m-0">Most enrolled courses</p>
+                </div>
               </div>
             }
+            bodyStyle={{ padding: '20px' }}
           >
             <Table
               columns={coursesColumns}
-              dataSource={topCoursesData}
+              dataSource={topCourses}
               pagination={false}
-              size="small"
+              size="middle"
+              locale={{
+                emptyText: (
+                  <div className="text-center py-8">
+                    <BookOutlined className="text-4xl text-gray-300 mb-2" />
+                    <p className="text-gray-500">No courses available</p>
+                  </div>
+                ),
+              }}
+              rowClassName="hover:bg-gray-50 transition-colors"
             />
           </Card>
-        </Col>
-      </Row>
+        </div>
+
+        {/* Course Status Chart - Compact */}
+        <div className="lg:col-span-1">
+          <Card
+            className="shadow-xl border-0 rounded-2xl h-full"
+            title={
+              <div>
+                <h3 className="text-lg font-bold text-gray-800 m-0">Course Status</h3>
+                <p className="text-xs text-gray-500 m-0 mt-1">Distribution overview</p>
+              </div>
+            }
+            bodyStyle={{ padding: '20px' }}
+          >
+            <div style={{ height: "200px" }} className="flex items-center justify-center mb-4">
+              <Pie data={pieData} options={pieOptions} />
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                  <span className="font-medium text-gray-700 text-sm">Active</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-green-600">
+                    {courseStatusData.active}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {totalCourseStatus > 0 
+                      ? ((courseStatusData.active / totalCourseStatus) * 100).toFixed(1) 
+                      : 0}%
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-500">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
+                  <span className="font-medium text-gray-700 text-sm">Inactive</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-yellow-600">
+                    {courseStatusData.inactive}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {totalCourseStatus > 0 
+                      ? ((courseStatusData.inactive / totalCourseStatus) * 100).toFixed(1) 
+                      : 0}%
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Recent Activities Section */}
+      <div className="mt-6">
+        <Card
+          className="shadow-xl border-0 rounded-2xl"
+          title={
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-lg flex items-center justify-center mr-3">
+                <ClockCircleOutlined className="text-white text-lg" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-800 m-0">Recent Activities</h3>
+                <p className="text-xs text-gray-500 m-0">Latest updates</p>
+              </div>
+            </div>
+          }
+          bodyStyle={{ padding: '20px' }}
+        >
+          <Table
+            columns={activityColumns}
+            dataSource={recentActivities}
+            pagination={false}
+            size="small"
+            locale={{
+              emptyText: (
+                <div className="text-center py-8">
+                  <ClockCircleOutlined className="text-4xl text-gray-300 mb-2" />
+                  <p className="text-gray-500">No recent activities</p>
+                </div>
+              ),
+            }}
+            rowClassName="hover:bg-gray-50 transition-colors"
+          />
+        </Card>
+      </div>
     </div>
   );
 };

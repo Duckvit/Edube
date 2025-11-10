@@ -77,7 +77,7 @@ export const PublicNavigate = ({
 
         const profileRes = await getProfile(payload.username, token);
         if (profileRes?.user) {
-          setUserData(profileRes.user); // Lưu vào Zustand
+          setUserData({ ...profileRes.user, role: userRole }); // Lưu vào Zustand
         }
 
         const dashboardPath = roleForComponent[userRole];
@@ -156,7 +156,9 @@ export const PublicNavigate = ({
         learnerHttpStatus === 200 || learnerHttpStatus === 201;
 
       if (isLearnerSuccess) {
-        toast.success("🎉 Registration successful! Please sign in to continue.");
+        toast.success(
+          "🎉 Registration successful! Please sign in to continue."
+        );
         setShowSignUp(false);
         switchToSignIn();
       } else {
@@ -178,81 +180,81 @@ export const PublicNavigate = ({
   };
 
   const handleMentorRegister = async (values) => {
-  setLoading(true);
-  try {
-    // Step 1: Create user account
-    const userPayload = {
-      username: values.username,
-      email: values.email,
-      password: values.password,
-      fullName: values.fullName,
-    };
+    setLoading(true);
+    try {
+      // Step 1: Create user account
+      const userPayload = {
+        username: values.username,
+        email: values.email,
+        password: values.password,
+        fullName: values.fullName,
+      };
 
-    const userResponse = await UserRegister(userPayload);
+      const userResponse = await UserRegister(userPayload);
 
-    // UserRegister returns full response, check status
-    const userHttpStatus = userResponse?.status;
-    const userBackendStatus = userResponse?.data?.statusCode;
-    const isUserSuccess =
-      userHttpStatus === 200 ||
-      userHttpStatus === 201 ||
-      userBackendStatus === 200 ||
-      userBackendStatus === 201;
+      // UserRegister returns full response, check status
+      const userHttpStatus = userResponse?.status;
+      const userBackendStatus = userResponse?.data?.statusCode;
+      const isUserSuccess =
+        userHttpStatus === 200 ||
+        userHttpStatus === 201 ||
+        userBackendStatus === 200 ||
+        userBackendStatus === 201;
 
-    if (!isUserSuccess) {
-      toast.error(
-        userResponse?.data?.message ||
-          "❌ Failed to create user. Please try again."
+      if (!isUserSuccess) {
+        toast.error(
+          userResponse?.data?.message ||
+            "❌ Failed to create user. Please try again."
+        );
+        setLoading(false);
+        return;
+      }
+
+      const createdUser = userResponse.data?.user || userResponse.data;
+
+      if (!createdUser?.id) {
+        toast.error("❌ Failed to get user ID. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Create mentor profile
+      const mentorPayload = {
+        user: { id: createdUser.id },
+        bio: values.bio,
+        expertiseAreas: values.expertiseAreas,
+        qualification: values.qualification,
+      };
+
+      const mentorResponse = await createMentor(mentorPayload);
+
+      // createMentor returns res.data, so mentorResponse is the Response object with statusCode
+      const isSuccess =
+        mentorResponse?.statusCode === 200 ||
+        mentorResponse?.statusCode === 201;
+
+      if (!isSuccess) {
+        throw new Error(
+          mentorResponse?.message || "❌ Failed to create mentor profile."
+        );
+      }
+
+      toast.success(
+        "🎉 Mentor registration successful! Please sign in to continue."
       );
+      setShowMentorSignUp(false);
+      switchToSignIn();
+    } catch (error) {
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "⚠️ Registration failed. Please check your network and try again.";
+
+      toast.error(errorMessage);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const createdUser = userResponse.data?.user || userResponse.data;
-
-    if (!createdUser?.id) {
-      toast.error("❌ Failed to get user ID. Please try again.");
-      setLoading(false);
-      return;
-    }
-
-    // Step 2: Create mentor profile
-    const mentorPayload = {
-      user: { id: createdUser.id },
-      bio: values.bio,
-      expertiseAreas: values.expertiseAreas,
-      qualification: values.qualification,
-    };
-
-    const mentorResponse = await createMentor(mentorPayload);
-
-    // createMentor returns res.data, so mentorResponse is the Response object with statusCode
-    const isSuccess =
-      mentorResponse?.statusCode === 200 ||
-      mentorResponse?.statusCode === 201;
-
-    if (!isSuccess) {
-      throw new Error(
-        mentorResponse?.message || "❌ Failed to create mentor profile."
-      );
-    }
-
-    toast.success("🎉 Mentor registration successful! Please sign in to continue.");
-    setShowMentorSignUp(false);
-    switchToSignIn();
-  } catch (error) {
-    const errorMessage =
-      error?.response?.data?.message ||
-      error?.message ||
-      "⚠️ Registration failed. Please check your network and try again.";
-
-    toast.error(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
-
-
+  };
 
   const switchToSignIn = () => {
     registerForm.resetFields();
@@ -586,7 +588,10 @@ export const PublicNavigate = ({
                   label="Major Field"
                   name="majorField"
                   rules={[
-                    { required: true, message: "Please enter your major field" },
+                    {
+                      required: true,
+                      message: "Please enter your major field",
+                    },
                   ]}
                 >
                   <Input

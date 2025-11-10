@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   Table,
@@ -10,6 +10,10 @@ import {
   Space,
   Dropdown,
   Modal,
+  Form,
+  Row,
+  Col,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -22,114 +26,133 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
 } from "@ant-design/icons";
+import {
+  getAllLearners,
+  getLearnerById,
+  updateLearner,
+  deleteLearner,
+} from "../../apis/LearnerServices";
 
 export const User = () => {
   const { Search } = Input;
   const { Option } = Select;
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [filterRole, setFilterRole] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const userData = [
-    {
-      key: "1",
-      id: "USR001",
-      name: "John Smith",
-      email: "john.smith@email.com",
-      role: "student",
-      status: "active",
-      joinDate: "2024-01-15",
-      lastLogin: "2024-01-20",
-      coursesEnrolled: 5,
-      avatar: null,
-    },
-    {
-      key: "2",
-      id: "USR002",
-      name: "Dr. Sarah Chen",
-      email: "sarah.chen@university.edu",
-      role: "instructor",
-      status: "active",
-      joinDate: "2023-11-20",
-      lastLogin: "2024-01-19",
-      coursesCreated: 12,
-      avatar: null,
-    },
-    {
-      key: "3",
-      id: "USR003",
-      name: "Emma Wilson",
-      email: "emma.wilson@email.com",
-      role: "student",
-      status: "inactive",
-      joinDate: "2024-01-10",
-      lastLogin: "2024-01-12",
-      coursesEnrolled: 2,
-      avatar: null,
-    },
-    {
-      key: "4",
-      id: "USR004",
-      name: "Prof. Michael Rodriguez",
-      email: "michael.rodriguez@college.edu",
-      role: "instructor",
-      status: "active",
-      joinDate: "2023-09-05",
-      lastLogin: "2024-01-20",
-      coursesCreated: 8,
-      avatar: null,
-    },
-    {
-      key: "5",
-      id: "USR005",
-      name: "Lisa Thompson",
-      email: "lisa.thompson@business.com",
-      role: "instructor",
-      status: "pending",
-      joinDate: "2024-01-18",
-      lastLogin: "Never",
-      coursesCreated: 0,
-      avatar: null,
-    },
-    {
-      key: "6",
-      id: "USR006",
-      name: "Alex Kumar",
-      email: "alex.kumar@email.com",
-      role: "student",
-      status: "active",
-      joinDate: "2023-12-01",
-      lastLogin: "2024-01-19",
-      coursesEnrolled: 8,
-      avatar: null,
-    },
-    {
-      key: "7",
-      id: "USR007",
-      name: "Maria Garcia",
-      email: "maria.garcia@email.com",
-      role: "student",
-      status: "suspended",
-      joinDate: "2023-10-15",
-      lastLogin: "2024-01-05",
-      coursesEnrolled: 3,
-      avatar: null,
-    },
-    {
-      key: "8",
-      id: "USR008",
-      name: "David Park",
-      email: "david.park@tech.com",
-      role: "instructor",
-      status: "active",
-      joinDate: "2023-08-20",
-      lastLogin: "2024-01-20",
-      coursesCreated: 15,
-      avatar: null,
-    },
-  ];
+  const [learners, setLearners] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1); // UI page is 1-based
+  const [pageSize, setPageSize] = useState(20);
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
+  const [currentLearner, setCurrentLearner] = useState(null);
+  const [form] = Form.useForm();
+  const token = localStorage.getItem("token");
 
+  useEffect(() => {
+    fetchLearners(0, pageSize);
+  }, []);
+
+  const fetchLearners = async (pageIndex = 0, size = 20) => {
+    setLoading(true);
+    try {
+      const data = await getAllLearners(pageIndex, size, token);
+      const items = data?.content || [];
+      setLearners(items);
+      setTotal(data?.totalElements || items.length || 0);
+      setPage((pageIndex || 0) + 1);
+      setPageSize(size);
+    } catch (err) {
+      console.error("Failed to fetch learners", err);
+      message.error("Failed to load learners");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onTableChange = (pagination) => {
+    const { current, pageSize: newSize } = pagination;
+    const pageIndex = Math.max(0, (current || 1) - 1);
+    fetchLearners(pageIndex, newSize);
+  };
+
+  const handleSearchById = async (val) => {
+    const trimmed = String(val || "").trim();
+    if (!trimmed) {
+      fetchLearners(0, pageSize);
+      return;
+    }
+    setLoading(true);
+    try {
+      const id = trimmed;
+      const data = await getLearnerById(id, token);
+      if (data) {
+        setLearners([data]);
+        setTotal(1);
+        setPage(1);
+      } else {
+        setLearners([]);
+        setTotal(0);
+      }
+    } catch (err) {
+      console.error("Search learner failed", err);
+      message.error("Learner not found");
+      setLearners([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showUpdateModal = (record) => {
+    setCurrentLearner(record);
+    form.setFieldsValue({
+      majorField: record.majorField || "",
+      educationLevel: record.educationLevel || "",
+      learningPreferences: record.learningPreferences || "",
+    });
+    setUpdateModalVisible(true);
+  };
+
+  const handleUpdate = async () => {
+    try {
+      const values = await form.validateFields();
+      const id = currentLearner?.id;
+      if (!id) return message.error("Missing learner id");
+      setLoading(true);
+      await updateLearner(id, values, token);
+      message.success("Learner updated");
+      setUpdateModalVisible(false);
+      fetchLearners(Math.max(0, page - 1), pageSize);
+    } catch (err) {
+      console.error("Update learner failed", err);
+      message.error("Update failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = (id) => {
+    Modal.confirm({
+      title: `Are you sure you want to delete user ${id}?`,
+      okText: "Yes",
+      cancelText: "No",
+      okType: "danger",
+      onOk: async () => {
+        try {
+          setLoading(true);
+          await deleteLearner(id, token);
+          message.success("Learner deleted");
+          fetchLearners(Math.max(0, page - 1), pageSize);
+        } catch (err) {
+          console.error("Delete failed", err);
+          message.error("Delete failed");
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
+  };
   const getActionItems = (record) => [
     {
       key: "view",
@@ -265,63 +288,31 @@ export const User = () => {
   //   },
   // ];
   const columns = [
+    { title: "No", width: 60, key: "no", render: (t, r, i) => i + 1 },
+    { title: "ID", dataIndex: "id", key: "id" },
+    { title: "Major Field", dataIndex: "majorField", key: "majorField" },
     {
-      title: "No",
-      width: 60,
-      dataIndex: "no",
-      key: "no",
-      fixed: "left",
-      render: (text, record, index) => index + 1,
+      title: "Education Level",
+      dataIndex: "educationLevel",
+      key: "educationLevel",
     },
     {
-      title: "Avatar",
-      dataIndex: ["user", "avatar"],
-      key: "avatar",
-      render: (avatar) =>
-        avatar ? (
-          <img
-            src={avatar}
-            alt="Avatar"
-            className="w-[7vw] h-[7vw] object-cover rounded-full"
-          />
-        ) : (
-          <div className="w-[7vw] h-[7vw] flex items-center justify-center rounded-full  text-2xl">
-            <UserOutlined />
-          </div>
-        ),
+      title: "Learning Preferences",
+      dataIndex: "learningPreferences",
+      key: "learningPreferences",
+      render: (text) => <div className="truncate max-w-md">{text}</div>,
     },
     {
-      title: "Full Name",
-      width: 250,
-      dataIndex: ["user", "fullName"],
-      key: "fullName",
-      fixed: "left",
+      title: "Credit Balance",
+      dataIndex: "creditBalance",
+      key: "creditBalance",
+      render: (c) => `${Number(c || 0).toFixed(2)}`,
     },
     {
-      title: "Email",
-      width: 280,
-      dataIndex: ["user", "email"],
-      key: "email",
-    },
-    {
-      title: "Birth Date",
-      dataIndex: ["user", "birthDate"],
-      key: "birthDate",
-    },
-    {
-      title: "Joined Date",
-      dataIndex: ["user", "dateCreated"],
-      key: "joinedDate",
-    },
-    {
-      title: "Phone",
-      dataIndex: ["user", "phone"],
-      key: "phone",
-    },
-    {
-      title: "Gender",
-      dataIndex: ["user", "gender"],
-      key: "gender",
+      title: "Joined At",
+      dataIndex: "joinedAt",
+      key: "joinedAt",
+      render: (d) => (d ? new Date(d).toLocaleString() : "N/A"),
     },
     {
       title: "Actions",
@@ -329,32 +320,15 @@ export const User = () => {
       fixed: "right",
       render: (text, record) => (
         <div className="flex flex-col gap-2">
-          {/* {record?.availableStatus !== "ACTIVE" ? (
-            <Button
-              className="!bg-gray-500 !text-white !w-full hover:cursor-not-allowed"
-              style={{ marginRight: "10px" }}
-            >
-              Inactive
-            </Button>
-          ) : (
-            <Button
-              className="!bg-blue-500 text-white w-full"
-              onClick={() => showUpdateModal(record)}
-              style={{ marginRight: "10px" }}
-            >
-              Update
-            </Button>
-          )} */}
           <Button
             className="!bg-blue-500 !text-white w-full"
             onClick={() => showUpdateModal(record)}
-            style={{ marginRight: "10px" }}
           >
             Update
           </Button>
           <Button
             className="!bg-red-500 !text-white !w-full"
-            onClick={() => handleDelete(record.user.id)}
+            onClick={() => handleDelete(record.id)}
           >
             Delete
           </Button>
@@ -363,18 +337,8 @@ export const User = () => {
     },
   ];
 
-  const filteredData = userData.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchText.toLowerCase()) ||
-      user.id.toLowerCase().includes(searchText.toLowerCase());
-
-    const matchesRole = filterRole === "all" || user.role === filterRole;
-    const matchesStatus =
-      filterStatus === "all" || user.status === filterStatus;
-
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  // Use server-provided learners list. Client-side filters/search use server APIs.
+  const filteredData = learners || [];
 
   return (
     <div className="w-full h-full bg-gray-100">
@@ -387,13 +351,14 @@ export const User = () => {
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="flex flex-col md:flex-row gap-4 items-center">
             <Search
-              placeholder="Search users by name, email, or ID"
+              placeholder="Search learners by ID"
               allowClear
               enterButton={<SearchOutlined />}
               size="large"
               className="w-full md:w-80"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
+              onSearch={handleSearchById}
             />
             <div className="flex gap-2">
               {/* <Select
@@ -423,7 +388,7 @@ export const User = () => {
             </div>
           </div>
           <div className="text-sm text-gray-600">
-            Showing {filteredData.length} of {userData.length} users
+            Showing {filteredData.length} of {total} learners
           </div>
         </div>
       </Card>
@@ -435,15 +400,68 @@ export const User = () => {
         dataSource={filteredData}
         rowKey="id"
         pagination={{
-          pageSize: 10,
+          current: page,
+          pageSize: pageSize,
+          total: total,
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (total, range) =>
-            `${range[0]}-${range[1]} of ${total} users`,
+          showTotal: (t, range) => `${range[0]}-${range[1]} of ${t} learners`,
         }}
+        onChange={onTableChange}
         scroll={{ x: "1600px", y: 400 }}
         loading={loading}
       />
+
+      {/* Update Learner Modal */}
+      <Modal
+        title={
+          currentLearner
+            ? `Update Learner ${currentLearner.id}`
+            : "Update Learner"
+        }
+        visible={updateModalVisible}
+        onOk={handleUpdate}
+        onCancel={() => setUpdateModalVisible(false)}
+        okText="Update"
+        cancelText="Cancel"
+        confirmLoading={loading}
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item
+            label="Major Field"
+            name="majorField"
+            rules={[{ required: true, message: "Please input major field" }]}
+          >
+            <Input placeholder="e.g. SE1" />
+          </Form.Item>
+
+          <Form.Item
+            label="Education Level"
+            name="educationLevel"
+            rules={[
+              { required: true, message: "Please select education level" },
+            ]}
+          >
+            <Select placeholder="Select level">
+              <Option value="Undergraduate">Undergraduate</Option>
+              <Option value="Postgraduate">Postgraduate</Option>
+              <Option value="Doctorate">Doctorate</Option>
+              <Option value="HighSchool">High School</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="Learning Preferences"
+            name="learningPreferences"
+            rules={[{ required: false }]}
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder="e.g. Prefers reading and practical examples"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

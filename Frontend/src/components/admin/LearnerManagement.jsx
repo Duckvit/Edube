@@ -268,32 +268,6 @@ export const User = () => {
               onChange={(e) => setSearchText(e.target.value)}
               onSearch={handleSearchById}
             />
-            <div className="flex gap-2">
-              {/* <Select
-                value={filterRole}
-                onChange={setFilterRole}
-                size="large"
-                className="w-32"
-                suffixIcon={<FilterOutlined />}
-              >
-                <Option value="all">All Roles</Option>
-                <Option value="student">Students</Option>
-                <Option value="instructor">Instructors</Option>
-              </Select> */}
-              <Select
-                value={filterStatus}
-                onChange={setFilterStatus}
-                size="large"
-                className="w-32"
-                suffixIcon={<FilterOutlined />}
-              >
-                <Option value="all">All Status</Option>
-                <Option value="active">Active</Option>
-                <Option value="inactive">Inactive</Option>
-                <Option value="pending">Pending</Option>
-                <Option value="suspended">Suspended</Option>
-              </Select>
-            </div>
           </div>
           <div className="text-sm text-gray-600">
             Showing {filteredData.length} of {total} learners

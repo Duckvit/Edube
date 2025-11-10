@@ -267,8 +267,6 @@ export const MentorManagement = () => {
                 <Option value="all">All Status</Option>
                 <Option value="active">Active</Option>
                 <Option value="inactive">Inactive</Option>
-                <Option value="pending">Pending</Option>
-                <Option value="suspended">Suspended</Option>
               </Select>
             </div>
           </div>

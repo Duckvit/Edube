@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import Swal from "sweetalert2";
 import { formatDate } from "../../utils/formatDate";
-import { getAllCourses, activeCourse } from "../../apis/CourseServices";
+import {
+  getAllCourses,
+  activeCourse,
+  deleteCourse,
+} from "../../apis/CourseServices";
 import {
   Card,
   Table,
@@ -41,34 +46,49 @@ const CourseManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
+  const [fullCourses, setFullCourses] = useState([]);
   const navigate = useNavigate();
 
+  // 🔹 Lấy toàn bộ courses 1 lần khi load trang
   useEffect(() => {
-    const fetchAllCourses = async () => {
+    const fetchFullCourses = async () => {
       try {
         const token = localStorage.getItem("token");
-        if (!token) {
-          setError("Token không tồn tại");
-          return;
-        }
-
-        setLoading(true);
-        const data = await getAllCourses(currentPage - 1, pageSize, token);
-        console.log("📘 API response getAllCourses:", data);
-
+        const data = await getAllCourses(0, 1000, token); // pageSize lớn đủ chứa tất cả
         const coursesData = data?.content || [];
-        setAllCourses(coursesData);
-
-        // Set total items từ response (Spring Boot Page format)
-        setTotalItems(data?.totalElements || data?.total || 0);
+        setFullCourses(coursesData);
+        setFilteredCourses(coursesData);
       } catch (err) {
-        console.error("Lỗi khi gọi API All Courses:", err);
-        setError(err.message || "Đã xảy ra lỗi");
-      } finally {
-        setLoading(false);
+        console.error(err);
       }
     };
+    fetchFullCourses();
+  }, []);
 
+  const fetchAllCourses = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setError("Token không tồn tại");
+        return;
+      }
+
+      setLoading(true);
+      const data = await getAllCourses(currentPage - 1, pageSize, token);
+      console.log("📘 API response getAllCourses:", data);
+
+      const coursesData = data?.content || [];
+      setAllCourses(coursesData);
+      setTotalItems(data?.totalElements || data?.total || 0);
+    } catch (err) {
+      console.error("Lỗi khi gọi API All Courses:", err);
+      setError(err.message || "Đã xảy ra lỗi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAllCourses();
   }, [currentPage, pageSize]);
 
@@ -85,6 +105,40 @@ const CourseManagement = () => {
     } catch (err) {
       console.error("Lỗi khi kích hoạt:", err);
       toast.error("Active Course failed!");
+    }
+  };
+
+  const handleDeleteCourse = async (id) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.error("Please log in first!");
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "This course will be permanently deleted!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, delete it!",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await deleteCourse(token, id);
+        console.log("Delete course response:", res);
+
+        // ✅ Nếu API trả về 204, coi là thành công
+        toast.success("🗑️ Course deleted successfully!");
+        await fetchAllCourses(); // cập nhật lại danh sách
+      } catch (error) {
+        console.error("Error deleting course:", error);
+        toast.error(
+          error?.response?.data?.message || "⚠️ Something went wrong!"
+        );
+      }
     }
   };
 
@@ -223,7 +277,10 @@ const CourseManagement = () => {
           </Button>
           <Button
             className="!bg-red-500 !text-white !w-full"
-            onClick={() => handleDelete(record.user.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteCourse(record.id);
+            }}
           >
             Delete
           </Button>
@@ -232,7 +289,7 @@ const CourseManagement = () => {
     },
   ];
 
-  const filteredData = allCourses.filter((course) => {
+  const filteredData = fullCourses.filter((course) => {
     const matchesSearch =
       course.title.toLowerCase().includes(searchText.toLowerCase()) ||
       (course.mentor?.user?.fullName || "")
@@ -249,7 +306,7 @@ const CourseManagement = () => {
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
-  const categories = [...new Set(allCourses.map((course) => course.category))];
+  const categories = [...new Set(fullCourses.map((course) => course.category))];
 
   return (
     <div className="w-full h-full bg-gray-100">
@@ -268,50 +325,32 @@ const CourseManagement = () => {
                 filterStatus === "all" ? "bg-blue-600" : "hover:bg-blue-50"
               }`}
             >
-              All ({allCourses.length})
+              All ({fullCourses.length})
             </Button>
             <Button
-              type={filterStatus === "approved" ? "primary" : "default"}
+              type={filterStatus === "active" ? "primary" : "default"}
+              onClick={() =>
+                setFilterStatus(filterStatus === "active" ? "all" : "active")
+              }
+              className={`${
+                filterStatus === "active" ? "bg-green-600" : "hover:bg-green-50"
+              }`}
+            >
+              Active ({fullCourses.filter((c) => c.status === "active").length})
+            </Button>
+            <Button
+              type={filterStatus === "inactive" ? "primary" : "default"}
               onClick={() =>
                 setFilterStatus(
-                  filterStatus === "approved" ? "all" : "approved"
+                  filterStatus === "inactive" ? "all" : "inactive"
                 )
               }
               className={`${
-                filterStatus === "approved"
-                  ? "bg-green-600"
-                  : "hover:bg-green-50"
+                filterStatus === "inactive" ? "bg-red-600" : "hover:bg-red-50"
               }`}
             >
-              Active ({allCourses.filter((c) => c.status === "active").length})
-            </Button>
-            <Button
-              type={filterStatus === "pending" ? "primary" : "default"}
-              onClick={() =>
-                setFilterStatus(filterStatus === "pending" ? "all" : "pending")
-              }
-              className={`${
-                filterStatus === "pending"
-                  ? "bg-orange-600"
-                  : "hover:bg-orange-50"
-              }`}
-            >
-              Pending ({allCourses.filter((c) => c.status === "pending").length}
-              )
-            </Button>
-            <Button
-              type={filterStatus === "rejected" ? "primary" : "default"}
-              onClick={() =>
-                setFilterStatus(
-                  filterStatus === "rejected" ? "all" : "rejected"
-                )
-              }
-              className={`${
-                filterStatus === "rejected" ? "bg-red-600" : "hover:bg-red-50"
-              }`}
-            >
-              Rejected (
-              {allCourses.filter((c) => c.status === "rejected").length})
+              Inactive (
+              {fullCourses.filter((c) => c.status === "inactive").length})
             </Button>
           </div>
 

@@ -55,8 +55,20 @@ export const AdminHome = () => {
 
         // Calculate statistics
         const totalCourses = courses.length;
-        const activeCourses = courses.filter(c => c.status === "active").length;
-        const inactiveCourses = courses.filter(c => c.status === "inactive").length;
+        const statusCounts = courses.reduce(
+          (acc, course) => {
+            const status = (course.status || "").toLowerCase();
+            if (status === "active") {
+              acc.active += 1;
+            } else if (status === "inactive") {
+              acc.inactive += 1;
+            }
+            return acc;
+          },
+          { active: 0, inactive: 0 }
+        );
+        const activeCourses = statusCounts.active;
+        const inactiveCourses = statusCounts.inactive;
 
         // Get unique mentors
         const uniqueMentors = new Set(courses.map(c => c.mentor?.id).filter(Boolean));
@@ -86,10 +98,7 @@ export const AdminHome = () => {
         });
 
         // Calculate course status distribution (only active and inactive)
-        setCourseStatusData({
-          active: activeCourses,
-          inactive: inactiveCourses,
-        });
+        setCourseStatusData(statusCounts);
 
         // Get top courses by enrollment (totalStudents)
         const sortedCourses = [...courses]
@@ -111,12 +120,12 @@ export const AdminHome = () => {
           .slice(0, 5)
           .map((course, index) => ({
             key: String(index + 1),
-            action: course.status === "active"
+            action: course.status?.toLowerCase() === "active"
               ? "Course Active"
               : "Course Created",
             user: course.mentor?.user?.fullName || "Unknown",
             time: formatDate(course.createdAt),
-            status: course.status === "active" ? "success" : "pending",
+            status: course.status?.toLowerCase() === "active" ? "success" : "pending",
           }));
         setRecentActivities(activities);
 

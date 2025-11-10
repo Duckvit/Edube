@@ -72,6 +72,7 @@ const CourseDetail = () => {
   useEffect(() => {
     let mounted = true;
     const load = async () => {
+      console.log(userData);
       try {
         const res = await getCourseById(courseId);
         const c = res?.data || res || {};
@@ -274,11 +275,11 @@ const CourseDetail = () => {
             />
             <div>
               <h3 className="text-lg font-semibold">{course.instructor}</h3>
-              <p className="text-gray-600">Senior Software Engineer & Educator</p>
+              {/* <p className="text-gray-600">Senior Software Engineer & Educator</p> */}
               {/* <Rate disabled defaultValue={5} className="text-sm mt-1" /> */}
             </div>
           </div>
-          {course.mentorId && (
+          {course.mentorId && userData.role === "ADMIN" && (
             <Button
               type="primary"
               icon={<MessageOutlined />}
@@ -1046,7 +1047,7 @@ const CourseDetail = () => {
               </h1>
               <div className="flex items-center gap-3 mb-4">
                 <p className="text-gray-600">by {course.instructor}</p>
-                {course.mentorId && (
+                {course.mentorId && userData.role === "ADMIN" && (
                   <Button
                     type="primary"
                     icon={<MessageOutlined />}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -20,6 +20,7 @@ import {
   DownloadOutlined,
   LockOutlined,
   ArrowLeftOutlined,
+  MessageOutlined,
 } from "@ant-design/icons";
 import { getCourseById } from "../../apis/CourseServices";
 import {
@@ -31,9 +32,13 @@ import {
   checkLessonCompletion,
   createLessonProgress,
   updateLessonProgress,
+  getLessonProgressByEnrollment,
 } from "../../apis/LessonProgressServices";
 import { useUserStore } from "../../store/useUserStore";
 import useAiStore from "../../store/useAiStore";
+import { createConversation } from "../../apis/ChatServices";
+import { toast } from "react-toastify";
+import path from "../../utils/path";
 
 const { TextArea } = Input;
 const { Title, Paragraph } = Typography;
@@ -49,9 +54,14 @@ const CourseDetail = () => {
   const [selectedLessonIndex, setSelectedLessonIndex] = useState(0);
   const [hasUserClickedLesson, setHasUserClickedLesson] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [videoProgress, setVideoProgress] = useState(0); // Progress của video hiện tại
   const [isPlaying, setIsPlaying] = useState(false);
   const [enrollmentId, setEnrollmentId] = useState(null);
   const [course, setCourse] = useState("");
+  const [videoStartTime, setVideoStartTime] = useState(null); // Track start time for video
+  const [lastProgressPercent, setLastProgressPercent] = useState(0); // Track last progress percentage sent to server
+  const [lastProgressUpdateTime, setLastProgressUpdateTime] = useState(0); // Track last progress update timestamp
+  const [lessonProgressMap, setLessonProgressMap] = useState(new Map()); // Map lessonId -> progress data
   const userData = useUserStore((s) => s.userData);
   const firstSection = course.curriculum?.[0];
   const firstLesson = firstSection?.lessons?.[currentLesson];
@@ -62,6 +72,7 @@ const CourseDetail = () => {
   useEffect(() => {
     let mounted = true;
     const load = async () => {
+      console.log(userData);
       try {
         const res = await getCourseById(courseId);
         const c = res?.data || res || {};
@@ -70,6 +81,7 @@ const CourseDetail = () => {
           id: c.id || c.courseId || c._id || courseId,
           title: c.title || c.name || "Untitled Course",
           instructor: c.instructor || c.mentor?.user?.fullName || "Unknown",
+          mentorId: c.mentor?.id || null,
           description: c.description || c.summary || c.overview || "",
           rating: c.rating || 5,
           students: c.totalStudents ?? 0,
@@ -108,7 +120,33 @@ const CourseDetail = () => {
           if (match) {
             progressPercentage = match.progressPercentage ?? 0;
             // store enrollment id for progress updates
-            if (match.id) setEnrollmentId(match.id);
+            if (match.id) {
+              setEnrollmentId(match.id);
+              // Fetch lesson progress data
+              const token = localStorage.getItem("token");
+              if (token) {
+                try {
+                  const lessonProgressList =
+                    await getLessonProgressByEnrollment(match.id, token);
+                  // Create a map of lessonId -> progress
+                  const progressMap = new Map();
+                  if (Array.isArray(lessonProgressList)) {
+                    lessonProgressList.forEach((progress) => {
+                      const lessonId =
+                        progress.lesson?.id ||
+                        progress.lessonId ||
+                        progress.lesson;
+                      if (lessonId) {
+                        progressMap.set(lessonId, progress);
+                      }
+                    });
+                  }
+                  if (mounted) setLessonProgressMap(progressMap);
+                } catch (err) {
+                  console.error("Failed to fetch lesson progress", err);
+                }
+              }
+            }
             // normalize status to FE shape: map ACTIVE -> IN PROGRESS
             mapped.enrollmentStatus =
               match.status === "ACTIVE" ? "IN PROGRESS" : match.status || null;
@@ -117,22 +155,35 @@ const CourseDetail = () => {
           console.error("Failed to fetch enrollment for course detail", e);
         }
 
-        // mark lessons as unlocked and compute completed based on progressPercentage
-        // mark lessons as unlocked and compute completed based on progressPercentage
+        // mark lessons as unlocked and compute completed based on lesson progress data
         const totalLessons =
           mapped.totalLessons ||
           (mapped.curriculum || []).reduce(
             (acc, s) => acc + (s.lessons?.length || 0),
             0
           );
-        const completedCount = Math.round(
-          ((progressPercentage || 0) / 100) * (totalLessons || 1)
-        );
+
+        // Build curriculum with completed status
+        // Note: lessonProgressMap will be set asynchronously, so we'll update it in a separate effect
         let assigned = 0;
         const curriculum = (mapped.curriculum || []).map((section) => {
           const lessons = (section.lessons || []).map((lesson) => {
-            const completed = assigned < completedCount;
+            const lessonId =
+              lesson.id || lesson.lessonId || lesson._id || lesson.lesson?.id;
+            // Try to get from lessonProgressMap (might be empty on first load)
+            const progress = lessonId ? lessonProgressMap.get(lessonId) : null;
+            const completedFromProgress =
+              progress?.isCompleted === true ||
+              (progress?.completionPercentage ?? 0) >= 100;
+
+            // Fallback to enrollment progress if lesson progress not available
+            const completedCount = Math.round(
+              ((progressPercentage || 0) / 100) * (totalLessons || 1)
+            );
+            const completed =
+              completedFromProgress || assigned < completedCount;
             assigned += 1;
+
             return {
               ...lesson,
               locked: false,
@@ -141,6 +192,21 @@ const CourseDetail = () => {
           });
           return { ...section, lessons };
         });
+
+        // Count actual completed lessons
+        let completedCount = 0;
+        curriculum.forEach((section) => {
+          section.lessons.forEach((lesson) => {
+            if (lesson.completed) completedCount++;
+          });
+        });
+
+        // Update progress percentage based on actual completed lessons if we have lesson progress data
+        if (lessonProgressMap.size > 0 && totalLessons > 0) {
+          progressPercentage = Math.round(
+            (completedCount / totalLessons) * 100
+          );
+        }
 
         mapped.curriculum = curriculum;
         mapped.progress = Math.round(progressPercentage || 0);
@@ -200,17 +266,63 @@ const CourseDetail = () => {
       </Card>
 
       <Card title="Instructor">
-        <div className="flex items-center space-x-4">
-          <Avatar
-            size={64}
-            icon={<UserOutlined />}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 !mr-3"
-          />
-          <div>
-            <h3 className="text-lg font-semibold">{course.instructor}</h3>
-            <p className="text-gray-600">Senior Software Engineer & Educator</p>
-            {/* <Rate disabled defaultValue={5} className="text-sm mt-1" /> */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Avatar
+              size={64}
+              icon={<UserOutlined />}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 !mr-3"
+            />
+            <div>
+              <h3 className="text-lg font-semibold">{course.instructor}</h3>
+              {/* <p className="text-gray-600">Senior Software Engineer & Educator</p> */}
+              {/* <Rate disabled defaultValue={5} className="text-sm mt-1" /> */}
+            </div>
           </div>
+          {course.mentorId && userData.role === "ADMIN" && (
+            <Button
+              type="primary"
+              icon={<MessageOutlined />}
+              className="!bg-blue-600 hover:!bg-blue-700"
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem("token");
+                  if (!token) {
+                    toast.error("Please log in to chat");
+                    return;
+                  }
+
+                  const userId =
+                    userData?.learner?.id ||
+                    useUserStore.getState().userData?.learner?.id ||
+                    useUserStore.getState().userData?.id ||
+                    Number(localStorage.getItem("userId")) ||
+                    1;
+
+                  // Tạo conversation nếu chưa có
+                  try {
+                    await createConversation({
+                      learner: { id: userId },
+                      mentor: { id: course.mentorId },
+                      course: { id: course.id },
+                      title: course.title || "Hỏi về khóa học",
+                    });
+                  } catch (err) {
+                    // Conversation có thể đã tồn tại, tiếp tục navigate
+                    console.log("Conversation may already exist:", err);
+                  }
+
+                  // Navigate đến trang chat
+                  navigate(`/${path.PUBLIC_LEARNER}/${path.USER_CHAT}`);
+                } catch (error) {
+                  console.error("Error navigating to chat:", error);
+                  toast.error("Failed to open chat");
+                }
+              }}
+            >
+              Chat
+            </Button>
+          )}
         </div>
       </Card>
     </div>
@@ -346,6 +458,127 @@ const CourseDetail = () => {
     // },
   ];
 
+  // Function to refresh lesson progress and update course curriculum
+  const refreshLessonProgressData = useCallback(async () => {
+    if (!enrollmentId) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const lessonProgressList = await getLessonProgressByEnrollment(
+        enrollmentId,
+        token
+      );
+      // Create a map of lessonId -> progress
+      const progressMap = new Map();
+      if (Array.isArray(lessonProgressList)) {
+        lessonProgressList.forEach((progress) => {
+          const lessonId =
+            progress.lesson?.id || progress.lessonId || progress.lesson;
+          if (lessonId) {
+            progressMap.set(lessonId, progress);
+          }
+        });
+      }
+      setLessonProgressMap(progressMap);
+
+      // Update course curriculum with actual lesson progress
+      setCourse((prevCourse) => {
+        if (!prevCourse || !prevCourse.curriculum) return prevCourse;
+
+        const updated = { ...prevCourse };
+        const curriculum = (updated.curriculum || []).map((section) => {
+          const lessons = (section.lessons || []).map((lesson) => {
+            const lessonId =
+              lesson.id || lesson.lessonId || lesson._id || lesson.lesson?.id;
+            const progress = lessonId ? progressMap.get(lessonId) : null;
+            const completed =
+              progress?.isCompleted === true ||
+              (progress?.completionPercentage ?? 0) >= 100;
+
+            return {
+              ...lesson,
+              completed,
+              locked: false,
+            };
+          });
+          return { ...section, lessons };
+        });
+
+        // Count actual completed lessons
+        let completedCount = 0;
+        curriculum.forEach((section) => {
+          section.lessons.forEach((lesson) => {
+            if (lesson.completed) completedCount++;
+          });
+        });
+
+        updated.curriculum = curriculum;
+        updated.completedLessons = completedCount;
+
+        const totalLessons =
+          updated.totalLessons ||
+          curriculum.reduce((acc, s) => acc + (s.lessons?.length || 0), 0);
+        if (totalLessons > 0) {
+          updated.progress = Math.round((completedCount / totalLessons) * 100);
+        }
+
+        return updated;
+      });
+    } catch (err) {
+      console.error("Failed to refresh lesson progress", err);
+    }
+  }, [enrollmentId]);
+
+  // Helper function to create/update lesson progress
+  const updateLessonProgress = useCallback(
+    async (
+      lesson,
+      completionPercentage,
+      timeSpentMinutes = 0,
+      isCompleted = false
+    ) => {
+      if (!enrollmentId || !lesson) return;
+
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      // Get lesson ID - could be id, lessonId, or _id
+      const lessonId =
+        lesson.id || lesson.lessonId || lesson._id || lesson.lesson?.id;
+      if (!lessonId) {
+        console.warn("Lesson ID not found", lesson);
+        return;
+      }
+
+      try {
+        const progressData = {
+          enrollment: {
+            id: enrollmentId,
+          },
+          lesson: {
+            id: lessonId,
+          },
+          isCompleted: isCompleted,
+          timeSpentMinutes: timeSpentMinutes,
+          completionPercentage: parseFloat(completionPercentage.toFixed(2)),
+        };
+
+        const result = await createLessonProgress(token, progressData);
+        // Refresh lesson progress data after update (with small delay to ensure DB update)
+        if (result) {
+          setTimeout(() => {
+            refreshLessonProgressData();
+          }, 500);
+        }
+      } catch (err) {
+        console.error("Failed to update lesson progress:", err);
+      }
+    },
+    [enrollmentId, refreshLessonProgressData]
+  );
+
   const handleTimeUpdate = (e) => {
     const video = e.target;
     const percent = (video.currentTime / video.duration) * 100;
@@ -364,6 +597,43 @@ const CourseDetail = () => {
     } catch (err) {
       // ignore
     }
+  };
+
+  // Helper function to determine content type
+  const getContentType = (lesson) => {
+    if (!lesson) return null;
+
+    // First check if contentType is explicitly set
+    if (lesson.contentType) {
+      return lesson.contentType.toLowerCase();
+    }
+
+    // Check contentUrl to determine type
+    const url = lesson.contentUrl;
+    if (url) {
+      const lower = String(url).toLowerCase();
+      const isVideo = /\.(mp4|webm|ogg|m3u8|mpd)(\?.*)?$/.test(lower);
+      const isPdf = /\.pdf(\?.*)?$/.test(lower);
+      const isDoc = /\.(docx?|pptx?|xlsx?)(\?.*)?$/.test(lower);
+
+      if (isVideo) return "video";
+      if (isPdf) return "pdf";
+      if (isDoc) return "doc";
+      return "other";
+    }
+
+    // Check contentText
+    if (lesson.contentText) {
+      return "reading";
+    }
+
+    return null;
+  };
+
+  // Handle mark as read for documents
+  const handleMarkAsRead = async () => {
+    if (!selectedLesson || selectedLesson.completed) return;
+    await completeCurrentLesson();
   };
 
   // Render lesson content based on its contentUrl or contentText
@@ -775,7 +1045,54 @@ const CourseDetail = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {course.title}
               </h1>
-              <p className="text-gray-600 mb-4">by {course.instructor}</p>
+              <div className="flex items-center gap-3 mb-4">
+                <p className="text-gray-600">by {course.instructor}</p>
+                {course.mentorId && userData.role === "ADMIN" && (
+                  <Button
+                    type="primary"
+                    icon={<MessageOutlined />}
+                    size="small"
+                    className="!bg-blue-600 hover:!bg-blue-700"
+                    onClick={async () => {
+                      try {
+                        const token = localStorage.getItem("token");
+                        if (!token) {
+                          toast.error("Please log in to chat");
+                          return;
+                        }
+
+                        const userId =
+                          userData?.learner?.id ||
+                          useUserStore.getState().userData?.learner?.id ||
+                          useUserStore.getState().userData?.id ||
+                          Number(localStorage.getItem("userId")) ||
+                          1;
+
+                        // Tạo conversation nếu chưa có
+                        try {
+                          await createConversation({
+                            learner: { id: userId },
+                            mentor: { id: course.mentorId },
+                            course: { id: course.id },
+                            title: course.title || "Hỏi về khóa học",
+                          });
+                        } catch (err) {
+                          // Conversation có thể đã tồn tại, tiếp tục navigate
+                          console.log("Conversation may already exist:", err);
+                        }
+
+                        // Navigate đến trang chat
+                        navigate(`/${path.PUBLIC_LEARNER}/${path.USER_CHAT}`);
+                      } catch (error) {
+                        console.error("Error navigating to chat:", error);
+                        toast.error("Failed to open chat");
+                      }
+                    }}
+                  >
+                    Chat
+                  </Button>
+                )}
+              </div>
               <div className="flex items-center space-x-6 text-sm text-gray-600">
                 {/* <div className="flex items-center">
                   <Rate
@@ -813,14 +1130,15 @@ const CourseDetail = () => {
 
                 <Button
                   size="middle"
+                  type="default"
                   onClick={() =>
                     useAiStore
                       .getState()
                       .summarizeCourseAndShow(course.id, course.title)
                   }
-                  className="!bg-white !border !border-gray-200 !rounded-md !text-sm"
+                  className="!bg-blue-50 !border !border-blue-200 !text-blue-700 hover:!bg-blue-100 hover:!border-blue-300 !rounded-md !text-sm !font-medium"
                 >
-                  Summarize This Course
+                  📚 Summarize This Course
                 </Button>
               </div>
             </div>
@@ -837,6 +1155,38 @@ const CourseDetail = () => {
               <div className="aspect-video rounded-lg bg-black mb-4 flex items-center justify-center">
                 {renderLessonContent(selectedLesson)}
               </div>
+              {/* Progress bar for video */}
+              {selectedLesson && getContentType(selectedLesson) === "video" && (
+                <div className="mt-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm text-gray-600">
+                      Video Progress
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      {Math.round(videoProgress)}%
+                    </span>
+                  </div>
+                  <Progress percent={Math.round(videoProgress)} />
+                </div>
+              )}
+              {/* Mark as Read button for documents */}
+              {selectedLesson &&
+                (getContentType(selectedLesson) === "pdf" ||
+                  getContentType(selectedLesson) === "doc") && (
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      type="primary"
+                      icon={<CheckCircleOutlined />}
+                      onClick={handleMarkAsRead}
+                      className="bg-blue-600"
+                      disabled={selectedLesson?.completed}
+                    >
+                      {selectedLesson?.completed
+                        ? "Already Read"
+                        : "Mark as Read"}
+                    </Button>
+                  </div>
+                )}
             </Card>
 
             {/* Tabs */}
@@ -879,51 +1229,52 @@ const CourseDetail = () => {
                         )}
                         <List
                           dataSource={section.lessons || []}
-                          renderItem={(lesson, index) => (
-                            <List.Item
-                              className={`cursor-pointer hover:bg-gray-50 px-2 py-3 rounded ${
-                                lesson.locked ? "opacity-50" : ""
-                              }`}
-                              onClick={() => {
-                                if (!lesson.locked) {
-                                  // mark that the user actively clicked a lesson so we trigger a server update
-                                  setHasUserClickedLesson(true);
-                                  setSelectedSectionIndex(sectionIndex);
-                                  setSelectedLessonIndex(index);
-                                }
-                              }}
-                            >
-                              <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center space-x-3">
-                                  {
-                                    // lesson.locked ? (
-                                    //   <LockOutlined className="text-gray-400" />
-                                    // ) : lesson.completed ? (
-                                    //   <CheckCircleOutlined className="text-green-500" />
-                                    // ) :
-                                    (() => {
-                                      const ct = String(
-                                        lesson.contentType || ""
-                                      ).toLowerCase();
-                                      return ct === "video" ? (
-                                        <PlayCircleOutlined className="text-blue-500" />
-                                      ) : (
-                                        <FileTextOutlined className="text-green-600" />
-                                      );
-                                    })()
+                          renderItem={(lesson, index) => {
+                            const isSelected =
+                              selectedSectionIndex === sectionIndex &&
+                              selectedLessonIndex === index;
+                            return (
+                              <List.Item
+                                className={`cursor-pointer px-2 py-3 rounded transition-colors ${
+                                  lesson.locked
+                                    ? "opacity-50"
+                                    : isSelected
+                                    ? "bg-blue-50 border-l-4 border-blue-500"
+                                    : "hover:bg-gray-50"
+                                }`}
+                                onClick={() => {
+                                  if (!lesson.locked) {
+                                    // mark that the user actively clicked a lesson so we trigger a server update
+                                    setHasUserClickedLesson(true);
+                                    setSelectedSectionIndex(sectionIndex);
+                                    setSelectedLessonIndex(index);
                                   }
-                                  <div>
-                                    <div className="font-medium text-sm">
-                                      {lesson.title}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {lesson.duration}
+                                }}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center space-x-3">
+                                    {lesson.locked ? (
+                                      <LockOutlined className="text-gray-400" />
+                                    ) : lesson.completed ? (
+                                      <CheckCircleOutlined className="text-green-500" />
+                                    ) : lesson.contentType === "video" ? (
+                                      <PlayCircleOutlined className="text-blue-500" />
+                                    ) : (
+                                      <FileTextOutlined className="text-green-600" />
+                                    )}
+                                    <div>
+                                      <div className="font-medium text-sm">
+                                        {lesson.title}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {lesson.duration}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            </List.Item>
-                          )}
+                              </List.Item>
+                            );
+                          }}
                         />
                       </div>
                     ),

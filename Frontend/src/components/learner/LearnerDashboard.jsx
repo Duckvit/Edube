@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-// previous static import (kept for reference):
-// import { enrolledCourses, allCourses } from "../../utils/mockData";
 import { getAllCourses } from "../../apis/CourseServices";
 import { createPayment } from "../../apis/PaymentServices";
 import {

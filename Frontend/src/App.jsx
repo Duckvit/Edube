@@ -98,9 +98,9 @@ function App() {
           // Route cho trang insctructor
           path={path.PUBLIC_MENTOR}
           element={
-            // <PrivateRoute role={role}>
-            <PublicMentor />
-            // </PrivateRoute>
+            <PrivateRoute role={role}>
+              <PublicMentor />
+            </PrivateRoute>
           }
         >
           <Route index element={<Dashboard />} />
@@ -121,9 +121,9 @@ function App() {
           // Route cho trang admin
           path={path.PUBLIC_ADMIN}
           element={
-            // <PrivateRoute role={role}>
-            <PublicAdmin />
-            // </PrivateRoute>
+            <PrivateRoute role={role}>
+              <PublicAdmin />
+            </PrivateRoute>
           }
         >
           <Route index element={<AdminHome />} />
@@ -149,9 +149,9 @@ function App() {
           // Route cho trang learner
           path={path.PUBLIC_LEARNER}
           element={
-            // <PrivateRoute role={role}>
-            <PublicLearner />
-            // </PrivateRoute>
+            <PrivateRoute role={role}>
+              <PublicLearner />
+            </PrivateRoute>
           }
         >
           <Route index element={<LearnerDashboard />} />

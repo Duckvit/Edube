@@ -77,7 +77,7 @@ export const PublicNavigate = ({
 
         const profileRes = await getProfile(payload.username, token);
         if (profileRes?.user) {
-          setUserData(profileRes.user); // Lưu vào Zustand
+          setUserData({ ...profileRes.user, role: userRole }); // Lưu vào Zustand
         }
 
         const dashboardPath = roleForComponent[userRole];
@@ -156,7 +156,9 @@ export const PublicNavigate = ({
         learnerHttpStatus === 200 || learnerHttpStatus === 201;
 
       if (isLearnerSuccess) {
-        toast.success("🎉 Registration successful! Please sign in to continue.");
+        toast.success(
+          "🎉 Registration successful! Please sign in to continue."
+        );
         setShowSignUp(false);
         switchToSignIn();
       } else {
@@ -178,81 +180,81 @@ export const PublicNavigate = ({
   };
 
   const handleMentorRegister = async (values) => {
-  setLoading(true);
-  try {
-    // Step 1: Create user account
-    const userPayload = {
-      username: values.username,
-      email: values.email,
-      password: values.password,
-      fullName: values.fullName,
-    };
+    setLoading(true);
+    try {
+      // Step 1: Create user account
+      const userPayload = {
+        username: values.username,
+        email: values.email,
+        password: values.password,
+        fullName: values.fullName,
+      };
 
-    const userResponse = await UserRegister(userPayload);
+      const userResponse = await UserRegister(userPayload);
 
-    // UserRegister returns full response, check status
-    const userHttpStatus = userResponse?.status;
-    const userBackendStatus = userResponse?.data?.statusCode;
-    const isUserSuccess =
-      userHttpStatus === 200 ||
-      userHttpStatus === 201 ||
-      userBackendStatus === 200 ||
-      userBackendStatus === 201;
+      // UserRegister returns full response, check status
+      const userHttpStatus = userResponse?.status;
+      const userBackendStatus = userResponse?.data?.statusCode;
+      const isUserSuccess =
+        userHttpStatus === 200 ||
+        userHttpStatus === 201 ||
+        userBackendStatus === 200 ||
+        userBackendStatus === 201;
 
-    if (!isUserSuccess) {
-      toast.error(
-        userResponse?.data?.message ||
-          "❌ Failed to create user. Please try again."
+      if (!isUserSuccess) {
+        toast.error(
+          userResponse?.data?.message ||
+            "❌ Failed to create user. Please try again."
+        );
+        setLoading(false);
+        return;
+      }
+
+      const createdUser = userResponse.data?.user || userResponse.data;
+
+      if (!createdUser?.id) {
+        toast.error("❌ Failed to get user ID. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Create mentor profile
+      const mentorPayload = {
+        user: { id: createdUser.id },
+        bio: values.bio,
+        expertiseAreas: values.expertiseAreas,
+        qualification: values.qualification,
+      };
+
+      const mentorResponse = await createMentor(mentorPayload);
+
+      // createMentor returns res.data, so mentorResponse is the Response object with statusCode
+      const isSuccess =
+        mentorResponse?.statusCode === 200 ||
+        mentorResponse?.statusCode === 201;
+
+      if (!isSuccess) {
+        throw new Error(
+          mentorResponse?.message || "❌ Failed to create mentor profile."
+        );
+      }
+
+      toast.success(
+        "🎉 Mentor registration successful! Please sign in to continue."
       );
+      setShowMentorSignUp(false);
+      switchToSignIn();
+    } catch (error) {
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "⚠️ Registration failed. Please check your network and try again.";
+
+      toast.error(errorMessage);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const createdUser = userResponse.data?.user || userResponse.data;
-
-    if (!createdUser?.id) {
-      toast.error("❌ Failed to get user ID. Please try again.");
-      setLoading(false);
-      return;
-    }
-
-    // Step 2: Create mentor profile
-    const mentorPayload = {
-      user: { id: createdUser.id },
-      bio: values.bio,
-      expertiseAreas: values.expertiseAreas,
-      qualification: values.qualification,
-    };
-
-    const mentorResponse = await createMentor(mentorPayload);
-
-    // createMentor returns res.data, so mentorResponse is the Response object with statusCode
-    const isSuccess =
-      mentorResponse?.statusCode === 200 ||
-      mentorResponse?.statusCode === 201;
-
-    if (!isSuccess) {
-      throw new Error(
-        mentorResponse?.message || "❌ Failed to create mentor profile."
-      );
-    }
-
-    toast.success("🎉 Mentor registration successful! Please sign in to continue.");
-    setShowMentorSignUp(false);
-    switchToSignIn();
-  } catch (error) {
-    const errorMessage =
-      error?.response?.data?.message ||
-      error?.message ||
-      "⚠️ Registration failed. Please check your network and try again.";
-
-    toast.error(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
-
-
+  };
 
   const switchToSignIn = () => {
     registerForm.resetFields();
@@ -290,7 +292,7 @@ export const PublicNavigate = ({
             />
             <a
               href="/"
-              className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-yellow-600 bg-clip-text text-transparent"
+              className="text-3xl font-bold bg-gradient-to-r from-sky-600 to-amber-600 bg-clip-text text-transparent"
             >
               Edube
             </a>
@@ -331,13 +333,13 @@ export const PublicNavigate = ({
               Sign In
             </button>
             <button
-              className="bg-gradient-to-r from-sky-600 to-yellow-600 text-white px-8 py-3 rounded-2xl hover:from-sky-700 hover:to-yellow-700 transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              className="bg-gradient-to-r from-sky-600 to-amber-500 text-white px-8 py-3 rounded-2xl hover:from-sky-700 hover:to-amber-600 transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               onClick={() => setShowSignUp(true)}
             >
               Get Started
             </button>
             <button
-              className="border-2 border-sky-600 text-blue-600 px-6 py-2 rounded-2xl hover:bg-sky-50 transition-all font-semibold"
+              className="border-2 border-sky-600 text-sky-600 px-6 py-2 rounded-2xl hover:bg-sky-50 transition-all font-semibold"
               onClick={() => setShowMentorSignUp(true)}
             >
               Be a Mentor now
@@ -422,7 +424,7 @@ export const PublicNavigate = ({
               </Form.Item> */}
                 <a
                   href="/forgot-password"
-                  className="text-blue-600 hover:text-blue-700 text-sm"
+                  className="text-sky-600 hover:text-sky-700 text-sm"
                 >
                   Forgot password?
                 </a>
@@ -437,7 +439,7 @@ export const PublicNavigate = ({
                   loading={loading}
                   onClick={handleLogin}
                   size="large"
-                  className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-blue-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-blue-700 hover:!to-blue-700 !text-white"
+                  className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-sky-700 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-sky-800 !text-white"
                 >
                   Sign in{" "}
                 </Button>
@@ -447,7 +449,7 @@ export const PublicNavigate = ({
                 icon={<FcGoogle size={20} />}
                 block
                 onClick={handleLoginGoogle}
-                className="w-full bg-gray-100 hover:bg-blue-300 flex items-center justify-center"
+                className="w-full bg-gray-100 hover:bg-sky-100 flex items-center justify-center border-gray-200"
               >
                 Google
               </Button>
@@ -461,7 +463,7 @@ export const PublicNavigate = ({
                     setShowSignIn(false);
                     setShowSignUp(true);
                   }}
-                  className="text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-sky-600 hover:text-sky-700 font-medium"
                 >
                   Sign up here
                 </button>
@@ -586,7 +588,10 @@ export const PublicNavigate = ({
                   label="Major Field"
                   name="majorField"
                   rules={[
-                    { required: true, message: "Please enter your major field" },
+                    {
+                      required: true,
+                      message: "Please enter your major field",
+                    },
                   ]}
                 >
                   <Input
@@ -654,7 +659,7 @@ export const PublicNavigate = ({
                     htmlType="submit"
                     loading={loading}
                     size="large"
-                    className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-yellow-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-yellow-700 !text-white"
+                    className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-amber-500 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-amber-600 !text-white"
                   >
                     Create Account
                   </Button>
@@ -842,7 +847,7 @@ export const PublicNavigate = ({
                     htmlType="submit"
                     loading={loading}
                     size="large"
-                    className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-blue-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-blue-700 !text-white"
+                    className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-sky-700 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-sky-800 !text-white"
                   >
                     Become a Mentor
                   </Button>

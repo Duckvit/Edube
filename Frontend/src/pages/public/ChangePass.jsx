@@ -141,7 +141,7 @@ const ChangePass = () => {
               htmlType="submit"
               isLoading={isLoading}
               // size="large"
-              className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-blue-600 !border-none !rounded-xl !font-semibold !text-lg hover:!from-blue-700 hover:!to-blue-700 !text-white"
+              className="w-full h-12 !bg-gradient-to-r !from-sky-600 !to-sky-700 !border-none !rounded-xl !font-semibold !text-lg hover:!from-sky-700 hover:!to-sky-800 !text-white"
             >
               Confirm
             </Button>

@@ -7,6 +7,7 @@ export const useUserStore = create(
       token: null,
       role: null,
       isLoggedIn: false,
+      hydrated: false,
       userData: null,
       instructorOfCourse: null,
       fullData: null,
@@ -19,6 +20,7 @@ export const useUserStore = create(
           token,
           role,
           isLoggedIn,
+          hydrated: true,
           userData: null,
         })),
 
@@ -42,10 +44,12 @@ export const useUserStore = create(
           email: null,
           username: null,
           otp: null,
+          hydrated: true
         })),
     }),
     {
-      name: "user-storage", // 👈 key trong localStorage
+      name: "user-storage", 
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );

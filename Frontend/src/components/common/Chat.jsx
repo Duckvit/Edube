@@ -467,7 +467,7 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
       return;
     }
 
-    const wsUrl = `http://localhost:8080/ws?token=${encodeURIComponent(
+    const wsUrl = `https://be-edube.onrender.com/ws?token=${encodeURIComponent(
       jwtToken
     )}`;
     const socket = new SockJS(wsUrl);

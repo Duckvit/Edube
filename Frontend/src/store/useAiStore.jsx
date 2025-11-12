@@ -20,7 +20,7 @@ export const useAiStore = create((set, get) => ({
 
   // send a user message to AI, push user message then call API and push AI reply
   sendUserMessage: async (text) => {
-    const learnerId = useUserStore.getState().userData?.id || 1;
+    const learnerId = useUserStore.getState().userData?.learner?.id || 1;
     get().pushMessage({ sender: "user", text });
     // set loading so UI can show typing indicator
     set({ loading: true });
@@ -47,7 +47,7 @@ export const useAiStore = create((set, get) => ({
   // request a course summarize and push AI response
   // accepts courseId and optional courseTitle so UI shows the course name
   summarizeCourseAndShow: async (courseId, courseTitle) => {
-    const learnerId = useUserStore.getState().userData?.id || 1;
+    const learnerId = useUserStore.getState().userData?.learner?.id || 1;
     get().open();
     const titleText = courseTitle || courseId;
     get().pushMessage({

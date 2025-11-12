@@ -41,7 +41,7 @@ export const PublicNavigate = ({
   const navigate = useNavigate();
 
   const handleLoginGoogle = () => {
-    window.location.href = "http://localhost:8080/oauth2/authorization/google";
+    window.location.href = "https://be-edube.onrender.com/oauth2/authorization/google";
   };
 
   const handleCancel = () => {

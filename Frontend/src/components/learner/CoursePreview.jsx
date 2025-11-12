@@ -120,7 +120,8 @@ const CoursePreview = () => {
           }
         }
 
-        navigate(`/learner/course-detail/${courseId}`);
+        // Replace history entry so Back will go to Dashboard instead of CoursePreview
+        navigate(`/learner/course-detail/${courseId}`, { replace: true });
         return;
       }
 

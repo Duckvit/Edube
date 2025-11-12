@@ -17,7 +17,7 @@ class WebSocketService {
     }
 
     // Tạo URL với token trong query parameter cho SockJS handshake
-    const wsUrl = `http://localhost:8080/ws${jwtToken ? `?token=${encodeURIComponent(jwtToken)}` : ''}`;
+    const wsUrl = `https://be-edube.onrender.com/ws${jwtToken ? `?token=${encodeURIComponent(jwtToken)}` : ''}`;
     const socket = new SockJS(wsUrl);
 
     this.client = new Client({

@@ -1036,7 +1036,7 @@ const CourseDetail = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div className="flex-1">
               <button
-                onClick={() => navigate(-1)}
+                onClick={() => navigate(`/learner`)}
                 className="flex items-center gap-2 text-blue-600 hover:underline cursor-pointer"
               >
                 <ArrowLeftOutlined />

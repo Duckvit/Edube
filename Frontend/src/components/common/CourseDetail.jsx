@@ -1158,7 +1158,7 @@ const CourseDetail = () => {
               {/* Progress bar for video */}
               {selectedLesson && getContentType(selectedLesson) === "video" && (
                 <div className="mt-4">
-                  <div className="mb-2 flex items-center justify-between">
+                  {/* <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm text-gray-600">
                       Video Progress
                     </span>
@@ -1166,7 +1166,7 @@ const CourseDetail = () => {
                       {Math.round(videoProgress)}%
                     </span>
                   </div>
-                  <Progress percent={Math.round(videoProgress)} />
+                  <Progress percent={Math.round(videoProgress)} /> */}
                 </div>
               )}
               {/* Mark as Read button for documents */}
@@ -1253,11 +1253,13 @@ const CourseDetail = () => {
                               >
                                 <div className="flex items-center justify-between w-full">
                                   <div className="flex items-center space-x-3">
-                                    {lesson.locked ? (
-                                      <LockOutlined className="text-gray-400" />
-                                    ) : lesson.completed ? (
-                                      <CheckCircleOutlined className="text-green-500" />
-                                    ) : lesson.contentType === "video" ? (
+                                    {lesson.locked ? 
+                                    // (
+                                    //   <LockOutlined className="text-gray-400" />
+                                    // ) : lesson.completed ? (
+                                    //   <CheckCircleOutlined className="text-green-500" />
+                                    // ) : lesson.contentType === "video" ? 
+                                    (
                                       <PlayCircleOutlined className="text-blue-500" />
                                     ) : (
                                       <FileTextOutlined className="text-green-600" />

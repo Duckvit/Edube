@@ -53,9 +53,10 @@ export const addTimeToLessonProgress = async (id, additionalMinutes, token) => {
   return res.data;
 };
 
-export const getCourseProgress = async (courseId, token) => {
+// NOTE: server expects an enrollmentId here (not courseId) — returns numeric percent
+export const getCourseProgress = async (enrollmentId, token) => {
   const res = await axiosConfig.get(
-    `/api/lesson-progress/course-progress/${courseId}`,
+    `/api/lesson-progress/course-progress/${enrollmentId}`,
     {
       headers: authHeaders(token),
     }

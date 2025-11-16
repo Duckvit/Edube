@@ -11,6 +11,8 @@ import {
   Rate,
   Collapse,
   Typography,
+  Modal,
+  Form,
 } from "antd";
 import {
   PlayCircleOutlined,
@@ -21,6 +23,7 @@ import {
   LockOutlined,
   ArrowLeftOutlined,
   MessageOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
 import { getCourseById } from "../../apis/CourseServices";
 import {
@@ -37,6 +40,7 @@ import {
 import { useUserStore } from "../../store/useUserStore";
 import useAiStore from "../../store/useAiStore";
 import { createConversation } from "../../apis/ChatServices";
+import { createCourseReview } from "../../apis/ReviewServices";
 import { toast } from "react-toastify";
 import path from "../../utils/path";
 
@@ -62,6 +66,8 @@ const CourseDetail = () => {
   const [lastProgressPercent, setLastProgressPercent] = useState(0); // Track last progress percentage sent to server
   const [lastProgressUpdateTime, setLastProgressUpdateTime] = useState(0); // Track last progress update timestamp
   const [lessonProgressMap, setLessonProgressMap] = useState(new Map()); // Map lessonId -> progress data
+  const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
+  const [reviewForm] = Form.useForm();
   const userData = useUserStore((s) => s.userData);
   const firstSection = course.curriculum?.[0];
   const firstLesson = firstSection?.lessons?.[currentLesson];
@@ -279,50 +285,62 @@ const CourseDetail = () => {
               {/* <Rate disabled defaultValue={5} className="text-sm mt-1" /> */}
             </div>
           </div>
-          {course.mentorId && userData.role === "ADMIN" && (
-            <Button
-              type="primary"
-              icon={<MessageOutlined />}
-              className="!bg-blue-600 hover:!bg-blue-700"
-              onClick={async () => {
-                try {
-                  const token = localStorage.getItem("token");
-                  if (!token) {
-                    toast.error("Please log in to chat");
-                    return;
-                  }
-
-                  const userId =
-                    userData?.learner?.id ||
-                    useUserStore.getState().userData?.learner?.id ||
-                    useUserStore.getState().userData?.id ||
-                    Number(localStorage.getItem("userId")) ||
-                    1;
-
-                  // Tạo conversation nếu chưa có
+          <div className="flex items-center gap-2">
+            {userData.role === "LEARNER" && (
+              <Button
+                type="primary"
+                icon={<StarOutlined />}
+                className="!bg-amber-500 hover:!bg-amber-600"
+                onClick={() => setIsReviewModalVisible(true)}
+              >
+                Review
+              </Button>
+            )}
+            {course.mentorId && userData.role === "ADMIN" && (
+              <Button
+                type="primary"
+                icon={<MessageOutlined />}
+                className="!bg-blue-600 hover:!bg-blue-700"
+                onClick={async () => {
                   try {
-                    await createConversation({
-                      learner: { id: userId },
-                      mentor: { id: course.mentorId },
-                      course: { id: course.id },
-                      title: course.title || "Hỏi về khóa học",
-                    });
-                  } catch (err) {
-                    // Conversation có thể đã tồn tại, tiếp tục navigate
-                    console.log("Conversation may already exist:", err);
-                  }
+                    const token = localStorage.getItem("token");
+                    if (!token) {
+                      toast.error("Please log in to chat");
+                      return;
+                    }
 
-                  // Navigate đến trang chat
-                  navigate(`/${path.PUBLIC_LEARNER}/${path.USER_CHAT}`);
-                } catch (error) {
-                  console.error("Error navigating to chat:", error);
-                  toast.error("Failed to open chat");
-                }
-              }}
-            >
-              Chat
-            </Button>
-          )}
+                    const userId =
+                      userData?.learner?.id ||
+                      useUserStore.getState().userData?.learner?.id ||
+                      useUserStore.getState().userData?.id ||
+                      Number(localStorage.getItem("userId")) ||
+                      1;
+
+                    // Tạo conversation nếu chưa có
+                    try {
+                      await createConversation({
+                        learner: { id: userId },
+                        mentor: { id: course.mentorId },
+                        course: { id: course.id },
+                        title: course.title || "Hỏi về khóa học",
+                      });
+                    } catch (err) {
+                      // Conversation có thể đã tồn tại, tiếp tục navigate
+                      console.log("Conversation may already exist:", err);
+                    }
+
+                    // Navigate đến trang chat
+                    navigate(`/${path.PUBLIC_LEARNER}/${path.USER_CHAT}`);
+                  } catch (error) {
+                    console.error("Error navigating to chat:", error);
+                    toast.error("Failed to open chat");
+                  }
+                }}
+              >
+                Chat
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
     </div>
@@ -1028,6 +1046,37 @@ const CourseDetail = () => {
     hasUserClickedLesson,
   ]);
 
+  // Handler for submitting course review
+  const handleReviewSubmit = async (values) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Vui lòng đăng nhập để đánh giá");
+        return;
+      }
+
+      const reviewData = {
+        course: { id: course.id },
+        rating: values.rating,
+        reviewText: values.reviewText || "",
+      };
+
+      const response = await createCourseReview(reviewData, token);
+      
+      if (response.statusCode === 201) {
+        toast.success("Đánh giá đã được gửi thành công!");
+        setIsReviewModalVisible(false);
+        reviewForm.resetFields();
+      } else {
+        toast.error(response.message || "Có lỗi xảy ra khi gửi đánh giá");
+      }
+    } catch (error) {
+      console.error("Error submitting review:", error);
+      const errorMessage = error.response?.data?.message || "Có lỗi xảy ra khi gửi đánh giá";
+      toast.error(errorMessage);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Course Header */}
@@ -1287,6 +1336,79 @@ const CourseDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Review Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <StarOutlined className="text-amber-500" />
+            <span>Đánh giá khóa học</span>
+          </div>
+        }
+        open={isReviewModalVisible}
+        onCancel={() => {
+          setIsReviewModalVisible(false);
+          reviewForm.resetFields();
+        }}
+        footer={null}
+        width={600}
+      >
+        <Form
+          form={reviewForm}
+          layout="vertical"
+          onFinish={handleReviewSubmit}
+          className="mt-4"
+        >
+          <Form.Item
+            label="Đánh giá sao"
+            name="rating"
+            rules={[
+              { required: true, message: "Vui lòng chọn số sao đánh giá" },
+            ]}
+          >
+            <Rate allowHalf />
+          </Form.Item>
+
+          <Form.Item
+            label="Nhận xét"
+            name="reviewText"
+            rules={[
+              {
+                max: 1000,
+                message: "Nhận xét không được vượt quá 1000 ký tự",
+              },
+            ]}
+          >
+            <TextArea
+              rows={6}
+              placeholder="Chia sẻ trải nghiệm của bạn về khóa học này..."
+              showCount
+              maxLength={1000}
+            />
+          </Form.Item>
+
+          <Form.Item className="mb-0">
+            <div className="flex justify-end gap-2">
+              <Button
+                onClick={() => {
+                  setIsReviewModalVisible(false);
+                  reviewForm.resetFields();
+                }}
+              >
+                Hủy
+              </Button>
+              <Button
+                type="primary"
+                htmlType="submit"
+                className="!bg-amber-500 hover:!bg-amber-600"
+                icon={<StarOutlined />}
+              >
+                Gửi đánh giá
+              </Button>
+            </div>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

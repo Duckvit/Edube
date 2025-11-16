@@ -120,8 +120,8 @@ const CoursePreview = () => {
           }
         }
 
-        // Replace history entry so Back will go to Dashboard instead of CoursePreview
-        navigate(`/learner/course-detail/${courseId}`, { replace: true });
+        // After free enrollment, navigate user to Learner Dashboard -> My Learning tab
+        navigate(`/learner`, { state: { tab: "my-learning" }, replace: true });
         return;
       }
 

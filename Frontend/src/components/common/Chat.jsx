@@ -64,35 +64,39 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
 
   // Helper: Get sender ID for message sending
   // Backend accepts: user.id, learner.id, or mentor.id
+  // Priority: user.id (userId) > role-specific ID (learner.id/mentor.id)
   const getSenderId = () => {
     const currentUserId = getCurrentUserId();
     const normalizedRole = role?.toLowerCase();
 
-    // Priority: role-specific ID (learner.id/mentor.id) > user.id
-    // This matches backend's authorization logic in ChatService
-    if (normalizedRole === "learner") {
-      const senderId = userData?.learner?.id || selectedChat?.learner?.id || currentUserId;
-      console.log("🔍 Learner sender ID:", senderId, { 
+    // Priority: user.id (userId) first, then fallback to role-specific IDs
+    // This ensures we use the main user ID which is more reliable
+    if (currentUserId) {
+      console.log("🔍 Using userId (currentUserId):", currentUserId, { 
+        userDataId: userData?.id,
         learnerId: userData?.learner?.id, 
-        selectedChatLearnerId: selectedChat?.learner?.id,
-        currentUserId 
+        mentorId: userData?.mentor?.id,
+        role: normalizedRole
       });
+      return currentUserId;
+    }
+
+    // Fallback to role-specific IDs if userId is not available
+    if (normalizedRole === "learner") {
+      const senderId = userData?.learner?.id || selectedChat?.learner?.id;
+      console.log("🔍 Learner fallback sender ID:", senderId);
       return senderId;
     }
     
     if (normalizedRole === "mentor") {
-      const senderId = userData?.mentor?.id || selectedChat?.mentor?.id || currentUserId;
-      console.log("🔍 Mentor sender ID:", senderId, { 
-        mentorId: userData?.mentor?.id, 
-        selectedChatMentorId: selectedChat?.mentor?.id,
-        currentUserId 
-      });
+      const senderId = userData?.mentor?.id || selectedChat?.mentor?.id;
+      console.log("🔍 Mentor fallback sender ID:", senderId);
       return senderId;
     }
 
-    // Fallback: try to determine from selectedChat or use currentUserId
-    const senderId = selectedChat?.learner?.id || selectedChat?.mentor?.id || currentUserId;
-    console.log("🔍 Fallback sender ID:", senderId);
+    // Final fallback: try to determine from selectedChat
+    const senderId = selectedChat?.learner?.id || selectedChat?.mentor?.id;
+    console.log("🔍 Final fallback sender ID:", senderId);
     return senderId;
   };
 

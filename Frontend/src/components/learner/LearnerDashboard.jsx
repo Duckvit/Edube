@@ -70,7 +70,7 @@ export const LearnerDashboard = () => {
         }
 
         setLoading(true);
-        const data = await getAllCourses(0, 10, token);
+        const data = await getAllCourses(0, 100, token);
         console.log("📘 API response getAllCourses:", data);
 
         const coursesData = data?.content || [];

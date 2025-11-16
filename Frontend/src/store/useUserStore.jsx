@@ -16,12 +16,12 @@ export const useUserStore = create(
       otp: null,
 
       setModal: (token, role, isLoggedIn) =>
-        set(() => ({
+        set((state) => ({
           token,
           role,
           isLoggedIn,
-          hydrated: true,
-          userData: null,
+          // ❗ Không reset userData ở đây
+          hydrated: state.hydrated,
         })),
 
       setUserData: (userData) => set({ userData }),
@@ -44,12 +44,17 @@ export const useUserStore = create(
           email: null,
           username: null,
           otp: null,
-          hydrated: true
+          hydrated: true,
         })),
     }),
     {
-      name: "user-storage", 
+      name: "user-storage",
       storage: createJSONStorage(() => localStorage),
+
+      // ⭐ Quan trọng
+      onRehydrateStorage: () => (state) => {
+        state.hydrated = true;
+      },
     }
   )
 );

@@ -41,14 +41,29 @@ import { parseJwt } from "./utils/jwt";
 
 function App() {
   const [count, setCount] = useState(0);
-  const { token, userData, setUserData, role, resetUserStore } = useUserStore();
+  const { token, userData, setUserData, role, resetUserStore, hydrated } = useUserStore();
+  
+  // Đồng bộ token từ Zustand store vào localStorage (cho axios interceptor)
   useEffect(() => {
-    if (
-      !localStorage?.getItem("token") ||
-      localStorage?.getItem("token") === "null"
-    )
-      resetUserStore();
-  }, [useUserStore]);
+    if (hydrated) {
+      if (token && token !== "null") {
+        localStorage.setItem("token", token);
+      } else {
+        localStorage.removeItem("token");
+      }
+    }
+  }, [token, hydrated]);
+
+  // Chỉ reset store khi đã hydrate và token thực sự không tồn tại
+  useEffect(() => {
+    if (hydrated && (!token || token === "null")) {
+      // Kiểm tra lại localStorage để đảm bảo không có token nào
+      const localStorageToken = localStorage.getItem("token");
+      if (!localStorageToken || localStorageToken === "null") {
+        resetUserStore();
+      }
+    }
+  }, [hydrated, token, resetUserStore]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -70,6 +85,18 @@ function App() {
     fetchProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, userData]);
+
+  // Chờ hydration trước khi render routes để tránh redirect sai
+  if (!hydrated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

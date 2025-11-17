@@ -42,20 +42,41 @@ export default function OAuthCallback() {
       const defaultRole = role || "USER";
       setModal(token, defaultRole, true);
       
-      // Đợi một chút để đảm bảo Zustand store đã update state
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Đợi một chút để đảm bảo Zustand store đã update state và persist vào localStorage
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Verify token đã được set vào store
       const verifyToken = () => {
         const currentState = useUserStore.getState();
-        return currentState.token === token && currentState.isLoggedIn === true;
+        const localStorageToken = localStorage.getItem("token");
+        const isTokenInStore = currentState.token === token && currentState.isLoggedIn === true;
+        const isTokenInLocalStorage = localStorageToken === token;
+        
+        console.log("Verifying token:", {
+          tokenInStore: currentState.token === token,
+          isLoggedIn: currentState.isLoggedIn,
+          tokenInLocalStorage: isTokenInLocalStorage,
+          role: currentState.role,
+          expectedRole: defaultRole
+        });
+        
+        return isTokenInStore && isTokenInLocalStorage;
       };
       
-      // Retry nếu token chưa được set (tối đa 5 lần)
+      // Retry nếu token chưa được set (tối đa 10 lần, mỗi lần 150ms)
       let retryCount = 0;
-      while (!verifyToken() && retryCount < 5) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      while (!verifyToken() && retryCount < 10) {
+        await new Promise(resolve => setTimeout(resolve, 150));
         retryCount++;
+      }
+      
+      // Nếu sau tất cả retry vẫn không được, log error và thử set lại
+      const finalState = useUserStore.getState();
+      if (finalState.token !== token || !finalState.isLoggedIn) {
+        console.warn("Token not set after retries, attempting to set again...");
+        // Thử set lại một lần nữa
+        setModal(token, defaultRole, true);
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
       
       const normalizedRole = defaultRole?.toUpperCase();
@@ -167,24 +188,43 @@ export default function OAuthCallback() {
         }
       } else if (normalizedRole && roleForComponent[normalizedRole]) {
         // ✅ Nếu có role hợp lệ → điều hướng trực tiếp đến dashboard
-        // Đợi một chút để đảm bảo store đã update token và role
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Verify token và isLoggedIn trước khi navigate
+        // Verify token và isLoggedIn trước khi navigate (đã verify ở trên)
         const currentState = useUserStore.getState();
-        if (currentState.token === token && currentState.isLoggedIn && currentState.role === normalizedRole) {
+        const localStorageToken = localStorage.getItem("token");
+        
+        console.log("Final verification before navigate:", {
+          tokenMatch: currentState.token === token,
+          isLoggedIn: currentState.isLoggedIn,
+          roleMatch: currentState.role === normalizedRole,
+          localStorageMatch: localStorageToken === token
+        });
+        
+        if (currentState.token === token && currentState.isLoggedIn && currentState.role === normalizedRole && localStorageToken === token) {
+          // Đợi thêm một chút để đảm bảo mọi thứ đã sync
+          await new Promise(resolve => setTimeout(resolve, 100));
           navigate("/" + roleForComponent[normalizedRole]);
         } else {
-          // Nếu vẫn chưa update, thử lại sau 200ms nữa
-          setTimeout(() => {
-            const retryState = useUserStore.getState();
-            if (retryState.token === token && retryState.isLoggedIn && retryState.role === normalizedRole) {
-              navigate("/" + roleForComponent[normalizedRole]);
-            } else {
-              console.error("Failed to set token in store, redirecting to home");
-              navigate("/");
-            }
-          }, 200);
+          // Nếu vẫn chưa update, thử set lại và đợi
+          console.warn("Token/role mismatch, retrying setModal...");
+          setModal(token, normalizedRole, true);
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          const retryState = useUserStore.getState();
+          const retryLocalStorageToken = localStorage.getItem("token");
+          
+          if (retryState.token === token && retryState.isLoggedIn && retryState.role === normalizedRole && retryLocalStorageToken === token) {
+            navigate("/" + roleForComponent[normalizedRole]);
+          } else {
+            console.error("Failed to set token in store after retry:", {
+              token: retryState.token,
+              expectedToken: token,
+              isLoggedIn: retryState.isLoggedIn,
+              role: retryState.role,
+              expectedRole: normalizedRole,
+              localStorageToken: retryLocalStorageToken
+            });
+            navigate("/");
+          }
         }
       } else {
         console.log("Invalid role detected:", role, "Normalized:", normalizedRole);

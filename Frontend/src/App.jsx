@@ -55,12 +55,18 @@ function App() {
   }, [token, hydrated]);
 
   // Chỉ reset store khi đã hydrate và token thực sự không tồn tại
+  // KHÔNG reset nếu đang ở trang /login (OAuth callback)
   useEffect(() => {
     if (hydrated && (!token || token === "null")) {
-      // Kiểm tra lại localStorage để đảm bảo không có token nào
-      const localStorageToken = localStorage.getItem("token");
-      if (!localStorageToken || localStorageToken === "null") {
-        resetUserStore();
+      // Kiểm tra xem có phải đang ở trang OAuth callback không
+      const isOAuthCallback = window.location.pathname === "/login" && window.location.search.includes("token=");
+      
+      if (!isOAuthCallback) {
+        // Kiểm tra lại localStorage để đảm bảo không có token nào
+        const localStorageToken = localStorage.getItem("token");
+        if (!localStorageToken || localStorageToken === "null") {
+          resetUserStore();
+        }
       }
     }
   }, [hydrated, token, resetUserStore]);

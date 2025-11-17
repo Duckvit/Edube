@@ -261,39 +261,24 @@ export const LearnerDashboard = () => {
 
   console.log("📘 Filtered enrolled courses:", filteredEnrolledCourses);
   const filteredAllCourses = useMemo(() => {
-    return allCourses.filter((course) => {
-      const matchesSearch =
-        course.title.toLowerCase().includes(searchText.toLowerCase()) ||
-        (course.mentor?.user?.username || "")
-          .toLowerCase()
-          .includes(searchText.toLowerCase());
-      const matchesCategory =
-        categoryFilter === "all" || course.category === categoryFilter;
-      const matchesLevel =
-        levelFilter === "all" || course.level === levelFilter;
+    // exclude courses the learner already enrolled in
+    const enrolledIds = new Set((enrolledCourses || []).map((c) => c.id));
+    return allCourses
+      .filter((course) => !enrolledIds.has(course.id))
+      .filter((course) => {
+        const matchesSearch =
+          course.title.toLowerCase().includes(searchText.toLowerCase()) ||
+          (course.mentor?.user?.username || "")
+            .toLowerCase()
+            .includes(searchText.toLowerCase());
+        const matchesCategory =
+          categoryFilter === "all" || course.category === categoryFilter;
+        const matchesLevel =
+          levelFilter === "all" || course.level === levelFilter;
 
-      return matchesSearch && matchesCategory && matchesLevel;
-    });
-  }, [allCourses, searchText, categoryFilter, levelFilter]);
-
-  //   // exclude courses the learner already enrolled in
-  //   const enrolledIds = new Set((enrolledCourses || []).map((c) => c.id));
-  //   return allCourses
-  //     .filter((course) => !enrolledIds.has(course.id))
-  //     .filter((course) => {
-  //       const matchesSearch =
-  //         course.title.toLowerCase().includes(searchText.toLowerCase()) ||
-  //         (course.mentor?.user?.username || "")
-  //           .toLowerCase()
-  //           .includes(searchText.toLowerCase());
-  //       const matchesCategory =
-  //         categoryFilter === "all" || course.category === categoryFilter;
-  //       const matchesLevel =
-  //         levelFilter === "all" || course.level === levelFilter;
-
-  //       return matchesSearch && matchesCategory && matchesLevel;
-  //     });
-  // }, [allCourses, searchText, categoryFilter, levelFilter, enrolledCourses]);
+        return matchesSearch && matchesCategory && matchesLevel;
+      });
+  }, [allCourses, searchText, categoryFilter, levelFilter, enrolledCourses]);
 
   // console.log("📘 All courses:", allCourses);
   // console.log("📘 Filtered courses:", filteredAllCourses);
@@ -422,9 +407,12 @@ export const LearnerDashboard = () => {
                     <div>
                       <div className="flex justify-between text-sm mb-1">
                         <span>Progress</span>
-                        <span>{enroll.progress}%</span>
+                        <span>{Math.round(enroll.progress)}%</span>
                       </div>
-                      <Progress percent={enroll.progress} size="small" />
+                      <Progress
+                        percent={Math.round(enroll.progress)}
+                        size="small"
+                      />
                     </div>
                   )}
                 </div>

@@ -171,6 +171,68 @@ const CourseDetail = () => {
                   if (mounted) setLessonProgressMap(progressMap);
                   console.log("Loaded lesson progress map:", progressMap);
 
+                  // Ensure lessonProgress records exist for all lessons in the course.
+                  // If some lessons are missing, create them now (only once on load).
+                  try {
+                    const allLessonIds = [];
+                    (mapped.curriculum || []).forEach((section) => {
+                      (section.lessons || []).forEach((lsn) => {
+                        const lid =
+                          lsn.id || lsn.lessonId || lsn._id || lsn.lesson?.id;
+                        if (lid) allLessonIds.push(String(lid));
+                      });
+                    });
+
+                    const missing = allLessonIds.filter(
+                      (lid) => !progressMap.has(String(lid))
+                    );
+                    if (missing.length > 0) {
+                      console.log(
+                        "Creating missing lessonProgress entries:",
+                        missing.length
+                      );
+                      for (const lid of missing) {
+                        try {
+                          const payload = {
+                            enrollment: { id: match.id },
+                            lesson: { id: lid },
+                            isCompleted: false,
+                            timeSpentMinutes: 0,
+                            completionPercentage: 0.0,
+                          };
+                          // create and add to local map
+                          const created = await createLessonProgress(
+                            payload,
+                            token
+                          );
+                          console.log("Created lessonProgress for", lid, created);
+                          if (created) progressMap.set(String(lid), created);
+                        } catch (err) {
+                          console.warn(
+                            "Failed to create lessonProgress for",
+                            lid,
+                            err
+                          );
+                        }
+                      }
+                      // update state and refresh authoritative data
+                      if (mounted) setLessonProgressMap(new Map(progressMap));
+                      try {
+                        await refreshLessonProgressData();
+                      } catch (e) {
+                        console.warn(
+                          "refresh after creating missing lessonProgress failed",
+                          e
+                        );
+                      }
+                    }
+                  } catch (err) {
+                    console.warn(
+                      "Error ensuring lessonProgress records on load",
+                      err
+                    );
+                  }
+
                   // Map server lesson-progress `isCompleted` into the curriculum so
                   // the UI immediately reflects which lessons are completed.
                   const totalLessonsCount =
@@ -549,7 +611,7 @@ const CourseDetail = () => {
           const lessonId =
             progress.lesson?.id || progress.lessonId || progress.lesson;
           if (lessonId) {
-            progressMap.set(lessonId, progress);
+            progressMap.set(String(lessonId), progress);
           }
         });
       }
@@ -564,7 +626,9 @@ const CourseDetail = () => {
           const lessons = (section.lessons || []).map((lesson) => {
             const lessonId =
               lesson.id || lesson.lessonId || lesson._id || lesson.lesson?.id;
-            const progress = lessonId ? progressMap.get(lessonId) : null;
+            const progress = lessonId
+              ? progressMap.get(String(lessonId))
+              : null;
             const completed =
               progress?.isCompleted === true ||
               (progress?.completionPercentage ?? 0) >= 100;
@@ -673,7 +737,11 @@ const CourseDetail = () => {
             const lessons = (section.lessons || []).map((lsn) => {
               const lid = lsn.id || lsn.lessonId || lsn._id || lsn.lesson?.id;
               const lp = lid ? progressMap.get(String(lid)) : null;
-              const completed = !!(lp && (lp.isCompleted === true || (lp.completionPercentage ?? 0) >= 100));
+              const completed = !!(
+                lp &&
+                (lp.isCompleted === true ||
+                  (lp.completionPercentage ?? 0) >= 100)
+              );
               if (completed) completedCountLocal += 1;
               return { ...lsn, locked: false, completed };
             });
@@ -682,8 +750,14 @@ const CourseDetail = () => {
           updated.completedLessons = completedCountLocal;
           const total =
             updated.totalLessons ||
-            (updated.curriculum || []).reduce((acc, s) => acc + (s.lessons?.length || 0), 0);
-          updated.progress = total > 0 ? Math.round((completedCountLocal / total) * 100) : updated.progress;
+            (updated.curriculum || []).reduce(
+              (acc, s) => acc + (s.lessons?.length || 0),
+              0
+            );
+          updated.progress =
+            total > 0
+              ? Math.round((completedCountLocal / total) * 100)
+              : updated.progress;
           return updated;
         });
 
@@ -927,6 +1001,24 @@ const CourseDetail = () => {
       // Determine existing lesson-progress record for this lesson (prefer local map)
       try {
         let lp = lessonProgressMap.get(String(lessonId)) || null;
+
+        // Optimistically mark lesson completed in UI so user sees immediate feedback
+        setCourse((prev) => {
+          if (!prev) return prev;
+          const updated = { ...prev };
+          updated.curriculum = (updated.curriculum || []).map((section) => {
+            const lessons = (section.lessons || []).map((lsn) => {
+              const lid = lsn.id || lsn.lessonId || lsn._id || lsn.lesson?.id;
+              if (String(lid) === String(lessonId)) {
+                return { ...lsn, completed: true, locked: false };
+              }
+              return lsn;
+            });
+            return { ...section, lessons };
+          });
+          updated.completedLessons = (updated.completedLessons || 0) + 1;
+          return updated;
+        });
 
         // if not in local map, fetch list and refresh map
         if (!lp) {

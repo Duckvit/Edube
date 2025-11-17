@@ -28,7 +28,7 @@ import {
   HeartOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useUserStore } from "../../store/useUserStore";
 import { Brain } from "lucide-react";
 
@@ -36,6 +36,7 @@ const { Option } = Select;
 
 export const LearnerDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("my-learning");
   const [myLearningFilter, setMyLearningFilter] = useState("all");
   const [searchText, setSearchText] = useState("");
@@ -160,6 +161,14 @@ export const LearnerDashboard = () => {
     // initial load
     fetchEnrollCourses();
 
+    // If navigated here with a tab in location.state, activate it
+    try {
+      const tabFromNav = location?.state?.tab;
+      if (tabFromNav) setActiveTab(tabFromNav);
+    } catch (e) {
+      // ignore
+    }
+
     // listen to enrollment changes from other parts of the app (CourseDetail)
     const handler = (e) => {
       console.log("Received enrollment:updated event", e?.detail);
@@ -169,7 +178,7 @@ export const LearnerDashboard = () => {
     return () => {
       window.removeEventListener("enrollment:updated", handler);
     };
-  }, [userData]);
+  }, [userData, location]);
 
   const handleEnroll = async (courseId) => {
     try {
@@ -196,8 +205,23 @@ export const LearnerDashboard = () => {
     }
   };
 
-  const handleContinueCourse = (courseId) => {
-    navigate(`/learner/course-detail/${courseId}`);
+  const handleContinueCourse = (courseId, enrollmentId) => {
+    // Prefer passing enrollmentId so CourseDetail can load the correct enrollment context
+    // If we have an enrollment for this course in the mapped list, pass it along
+    const match = enrolledCourses.find(
+      (c) => String(c.enrollmentId) === String(enrollmentId)
+    );
+    console.log("Matched enrollment for courseId", enrollmentId, ":", match);
+    const eid = match ? match.enrollmentId : null;
+    if (eid) {
+      navigate(`/learner/course-detail/${courseId}`, {
+        state: { enrollmentId: eid },
+      });
+      console.log("Navigating with enrollmentId:", eid);
+    } else {
+      navigate(`/learner/course-detail/${courseId}`);
+      console.log("Navigating without enrollmentId");
+    }
   };
 
   const getStatusIcon = (status) => {
@@ -328,7 +352,7 @@ export const LearnerDashboard = () => {
             sm={12}
             lg={8}
             xl={6}
-            key={enroll.enrollmentId || enroll.id}
+            key={enroll.enrollmentId} //|| enroll.id}
           >
             <Card
               hoverable
@@ -383,9 +407,12 @@ export const LearnerDashboard = () => {
                     <div>
                       <div className="flex justify-between text-sm mb-1">
                         <span>Progress</span>
-                        <span>{enroll.progress}%</span>
+                        <span>{Math.round(enroll.progress)}%</span>
                       </div>
-                      <Progress percent={enroll.progress} size="small" />
+                      <Progress
+                        percent={Math.round(enroll.progress)}
+                        size="small"
+                      />
                     </div>
                   )}
                 </div>
@@ -399,7 +426,9 @@ export const LearnerDashboard = () => {
                     block
                     size="large"
                     className="bg-blue-600 font-medium"
-                    onClick={() => handleContinueCourse(enroll.id)}
+                    onClick={() =>
+                      handleContinueCourse(enroll.id, enroll.enrollmentId)
+                    }
                   >
                     {enroll.status === "completed"
                       ? "Review"

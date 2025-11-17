@@ -12,10 +12,15 @@ import { parseJwt } from '../../utils/jwt';
 export default function OAuthCallback() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setModal, resetUserStore, setUserData } = useUserStore();
+  const { setModal, resetUserStore, setUserData, hydrated } = useUserStore();
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
+    // Đợi store hydrate xong trước khi xử lý OAuth callback
+    if (!hydrated) {
+      return;
+    }
+
     const handleOAuthCallback = async () => {
       const queryParams = new URLSearchParams(location.search);
       const token = queryParams.get("token");
@@ -36,6 +41,22 @@ export default function OAuthCallback() {
       // Lưu token + role
       const defaultRole = role || "USER";
       setModal(token, defaultRole, true);
+      
+      // Đợi một chút để đảm bảo Zustand store đã update state
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Verify token đã được set vào store
+      const verifyToken = () => {
+        const currentState = useUserStore.getState();
+        return currentState.token === token && currentState.isLoggedIn === true;
+      };
+      
+      // Retry nếu token chưa được set (tối đa 5 lần)
+      let retryCount = 0;
+      while (!verifyToken() && retryCount < 5) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        retryCount++;
+      }
       
       const normalizedRole = defaultRole?.toUpperCase();
       
@@ -110,12 +131,20 @@ export default function OAuthCallback() {
 
             toast.success("🎉 Account created successfully! Welcome to Edube!");
             
-            // Navigate to learner dashboard
-            if (roleForComponent["LEARNER"]) {
-              setTimeout(() => {
+            // Đợi một chút để đảm bảo store đã update role
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // Verify lại trước khi navigate
+            const finalState = useUserStore.getState();
+            if (finalState.token === token && finalState.isLoggedIn && finalState.role === "LEARNER") {
+              // Navigate to learner dashboard
+              if (roleForComponent["LEARNER"]) {
                 navigate("/" + roleForComponent["LEARNER"]);
-              }, 500);
+              } else {
+                navigate("/");
+              }
             } else {
+              console.error("Failed to verify login state, redirecting to home");
               navigate("/");
             }
           } else {
@@ -138,9 +167,25 @@ export default function OAuthCallback() {
         }
       } else if (normalizedRole && roleForComponent[normalizedRole]) {
         // ✅ Nếu có role hợp lệ → điều hướng trực tiếp đến dashboard
-        setTimeout(() => {
+        // Đợi một chút để đảm bảo store đã update token và role
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Verify token và isLoggedIn trước khi navigate
+        const currentState = useUserStore.getState();
+        if (currentState.token === token && currentState.isLoggedIn && currentState.role === normalizedRole) {
           navigate("/" + roleForComponent[normalizedRole]);
-        }, 100);
+        } else {
+          // Nếu vẫn chưa update, thử lại sau 200ms nữa
+          setTimeout(() => {
+            const retryState = useUserStore.getState();
+            if (retryState.token === token && retryState.isLoggedIn && retryState.role === normalizedRole) {
+              navigate("/" + roleForComponent[normalizedRole]);
+            } else {
+              console.error("Failed to set token in store, redirecting to home");
+              navigate("/");
+            }
+          }, 200);
+        }
       } else {
         console.log("Invalid role detected:", role, "Normalized:", normalizedRole);
         resetUserStore();
@@ -152,14 +197,17 @@ export default function OAuthCallback() {
     };
 
     handleOAuthCallback();
-  }, [location.search, navigate, setModal, resetUserStore, setUserData]);
+  }, [location.search, navigate, setModal, resetUserStore, setUserData, hydrated]);
 
-  if (isProcessing) {
+  // Hiển thị loading nếu store chưa hydrate hoặc đang xử lý
+  if (!hydrated || isProcessing) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Setting up your account...</p>
+          <p className="text-gray-600">
+            {!hydrated ? "Loading..." : "Setting up your account..."}
+          </p>
         </div>
       </div>
     );

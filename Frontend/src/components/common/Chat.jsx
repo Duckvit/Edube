@@ -35,31 +35,70 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
 
   // Helper: Get current user ID
   const getCurrentUserId = () => {
-    if (userData?.id) return Number(userData.id);
+    if (userData?.id) {
+      const userId = Number(userData.id);
+      console.log("🔍 getCurrentUserId: Using userData.id:", userId);
+      return userId;
+    }
     if (jwtToken) {
       try {
         const decoded = parseJwt(jwtToken);
-        if (decoded?.userId) return Number(decoded.userId);
+        if (decoded?.userId) {
+          const userId = Number(decoded.userId);
+          console.log("🔍 getCurrentUserId: Using JWT decoded.userId:", userId);
+          return userId;
+        }
       } catch (e) {
         console.warn("Failed to parse JWT:", e);
       }
     }
+    console.warn("⚠️ getCurrentUserId: No userId found", { 
+      userDataId: userData?.id, 
+      hasJwtToken: !!jwtToken 
+    });
     return null;
   };
 
   // Helper: Check if message is from current user
+  // IMPORTANT: senderId is always userId, not learnerId or mentorId
   const isMessageFromCurrentUser = (msgSenderId, conversationData = null) => {
+    if (!msgSenderId) {
+      console.log("❌ No msgSenderId provided");
+      return false;
+    }
+    
+    // Normalize IDs to numbers for comparison
+    const normalizedMsgSenderId = Number(msgSenderId);
     const currentUserId = getCurrentUserId();
-    if (msgSenderId === currentUserId) return true;
-    if (userData?.learner?.id === msgSenderId) return true;
-    if (userData?.mentor?.id === msgSenderId) return true;
-    if (!conversationData) return false;
-    return (
-      (conversationData.learner?.id === msgSenderId &&
-        userData?.learner?.id === msgSenderId) ||
-      (conversationData.mentor?.id === msgSenderId &&
-        userData?.mentor?.id === msgSenderId)
-    );
+    
+    console.log("🔍 Checking if message is from current user:", {
+      msgSenderId,
+      normalizedMsgSenderId,
+      currentUserId,
+      userDataId: userData?.id,
+      role: role
+    });
+    
+    // Compare with current user ID (userId) - this is the only check needed
+    // Backend always returns senderId as userId
+    if (currentUserId && normalizedMsgSenderId === currentUserId) {
+      console.log("✅ Message from current user (userId match):", { 
+        msgSenderId, 
+        currentUserId,
+        match: "userId === msgSenderId"
+      });
+      return true;
+    }
+    
+    console.log("❌ Message NOT from current user:", { 
+      msgSenderId, 
+      normalizedMsgSenderId,
+      currentUserId,
+      userDataId: userData?.id,
+      role: role,
+      reason: "msgSenderId does not match currentUserId"
+    });
+    return false;
   };
 
   // Helper: Get sender ID for message sending
@@ -252,11 +291,25 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
         return;
       }
 
-      const mappedMessages = messagesList.map((msg) => ({
+      // Get current selectedChat to ensure we have conversation data
+      setSelectedChat((prev) => {
+        const conversationData = prev || selectedChat;
+        
+        const mappedMessages = messagesList.map((msg) => {
+          const isFromCurrentUser = isMessageFromCurrentUser(msg.senderId, conversationData);
+          console.log("🔍 Mapping message:", { 
+            msgId: msg.id, 
+            senderId: msg.senderId, 
+            isFromCurrentUser,
+            conversationData: { 
+              learnerId: conversationData?.learner?.id, 
+              mentorId: conversationData?.mentor?.id 
+            }
+          });
+          
+          return {
         id: msg.id,
-        sender: isMessageFromCurrentUser(msg.senderId, selectedChat)
-          ? "You"
-          : "Other",
+            sender: isFromCurrentUser ? "You" : "Other",
         senderId: msg.senderId,
         text: msg.message || "",
         time: msg.createdAt
@@ -264,12 +317,14 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
           : new Date().toLocaleTimeString(),
         createdAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
         isRead: msg.isRead !== false,
-      }));
+          };
+        });
 
-      setSelectedChat((prev) => ({
+        return {
         ...prev,
         messages: sortMessages(mappedMessages),
-      }));
+        };
+      });
     } catch (error) {
       console.error("Error loading messages:", error);
       if (error.response?.status === 401 || error.response?.status === 403) {
@@ -347,7 +402,12 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
                 isRead: chatMessage.isRead !== false,
               };
               
-              console.log("✅ Adding new message to UI:", newMessage);
+              console.log("✅ Adding new message to UI via WebSocket:", newMessage);
+              
+              // Auto-scroll to bottom when new message arrives
+              setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+              }, 100);
               
               return {
                 ...prev,
@@ -371,6 +431,12 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
                   ? new Date(chatMessage.createdAt).toLocaleTimeString()
                   : new Date().toLocaleTimeString(),
               };
+              // Sort conversations by last message time (most recent first)
+              updated.sort((a, b) => {
+                const aTime = new Date(a.lastMessageTime || 0).getTime();
+                const bTime = new Date(b.lastMessageTime || 0).getTime();
+                return bTime - aTime;
+              });
             }
             return updated;
           });
@@ -393,7 +459,22 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
     }
 
     const senderId = getSenderId();
+    console.log("🔍 sendMessage - getSenderId() returned:", senderId, {
+      userData: {
+        id: userData?.id,
+        learnerId: userData?.learner?.id,
+        mentorId: userData?.mentor?.id,
+      },
+      role: role,
+      selectedChatId: selectedChat?.id
+    });
+    
     if (!senderId) {
+      console.error("❌ sendMessage - No senderId found!", {
+        userData: userData,
+        role: role,
+        currentUserId: getCurrentUserId()
+      });
       toast.error("Unable to identify sender. Please refresh the page.");
       return;
     }
@@ -405,62 +486,74 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
       conversation: { id: selectedChat.id },
     };
 
+    console.log("📤 Attempting to send message:", chatMessageDto);
+
+    // Use REST API first to ensure message is saved to DB
+    // WebSocket will handle real-time updates via subscription
     try {
-      // Send via WebSocket
-      client.publish({
-        destination: "/app/chat.send-message",
-        body: JSON.stringify(chatMessageDto),
-      });
-
-      console.log("📤 Message sent via WebSocket:", chatMessageDto);
-
-      // Clear message input immediately for better UX
-      // The message will appear when we receive it via WebSocket subscription
-      setMessage("");
+      const token = localStorage.getItem("token");
+      console.log("📤 Sending message via REST API...");
+      const res = await sendMessageRest(selectedChat.id, token, chatMessageDto);
+      console.log("✅ Message sent via REST API:", res);
       
-      // Clear typing indicator
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      setIsTyping(false);
-      
-      // Scroll to bottom
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    } catch (err) {
-      console.error("Error sending message via WebSocket:", err);
-      toast.error("Failed to send message. Please try again.");
-      
-      // Fallback to REST API if WebSocket fails
-      try {
-        const token = localStorage.getItem("token");
-        const res = await sendMessageRest(selectedChat.id, token, chatMessageDto);
-        console.log("📤 Message sent via REST (fallback):", res);
-        
-        // Add message to UI manually
-        if (res?.id) {
-          setSelectedChat((prev) => ({
+      if (res?.statusCode === 201 && res?.chatMessage) {
+        // Message successfully saved to DB
+        // It will appear via WebSocket subscription, but we can also add it immediately for better UX
+        const savedMessage = res.chatMessage;
+        setSelectedChat((prev) => {
+          // Check if message already exists (from WebSocket)
+          const messageExists = prev.messages?.some((m) => m.id === savedMessage.id);
+          if (messageExists) {
+            return prev;
+          }
+          
+          return {
             ...prev,
             messages: sortMessages([
               ...(prev.messages || []),
               {
-                id: res.id,
-                text: messageText,
+                id: savedMessage.id,
                 sender: "You",
-                senderId: senderId,
-                time: new Date().toLocaleTimeString(),
-                createdAt: new Date(),
-                isRead: false,
+                senderId: savedMessage.senderId,
+                text: savedMessage.message || messageText,
+                time: savedMessage.createdAt
+                  ? new Date(savedMessage.createdAt).toLocaleTimeString()
+                  : new Date().toLocaleTimeString(),
+                createdAt: savedMessage.createdAt
+                  ? new Date(savedMessage.createdAt)
+                  : new Date(),
+                isRead: savedMessage.isRead !== false,
               },
             ]),
-          }));
-          setMessage("");
+          };
+        });
+        
+        // Clear message input
+        setMessage("");
+        
+        // Clear typing indicator
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
         }
-      } catch (restErr) {
-        console.error("Error sending message via REST fallback:", restErr);
-        toast.error("Failed to send message. Please check your connection.");
+        setIsTyping(false);
+        
+        // Scroll to bottom
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        console.error("❌ REST API failed - unexpected response:", res);
+        toast.error(res?.message || "Failed to send message. Please try again.");
       }
+    } catch (restErr) {
+      console.error("❌ Error sending message via REST API:", restErr);
+      const errorMessage = restErr?.response?.data?.message || restErr?.message || "Unknown error";
+      console.error("Error details:", {
+        status: restErr?.response?.status,
+        data: restErr?.response?.data,
+        message: errorMessage
+      });
+      toast.error(`Failed to send message: ${errorMessage}`);
     }
   };
 
@@ -471,7 +564,7 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
       return;
     }
 
-    const wsUrl = `https://be-edube.onrender.com/ws?token=${encodeURIComponent(
+    const wsUrl = `https://edube-eqhraqdkhde2d6fx.japanwest-01.azurewebsites.net/ws?token=${encodeURIComponent(
       jwtToken
     )}`;
     const socket = new SockJS(wsUrl);
@@ -521,6 +614,97 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
       subscribeToConversation(selectedChat.id);
     }
   }, [client, connected, selectedChat?.id]);
+
+  // Polling to fetch new messages periodically
+  useEffect(() => {
+    if (!selectedChat?.id || !jwtToken) return;
+
+    // Fetch new messages every 3 seconds
+    const pollInterval = setInterval(() => {
+      const fetchNewMessages = async () => {
+        try {
+          const response = await getMessages(selectedChat.id, 0, 50);
+          const messagesList = response?.chatMessages || [];
+
+          if (response?.statusCode === 204 || messagesList.length === 0) {
+            return;
+          }
+
+          setSelectedChat((prev) => {
+            if (!prev || prev.id !== selectedChat.id) return prev;
+            
+            const conversationData = prev;
+            const currentMessageIds = new Set(prev.messages?.map(m => m.id) || []);
+            
+            // Only add new messages that don't exist yet
+            const newMessages = messagesList
+              .filter(msg => !currentMessageIds.has(msg.id))
+              .map((msg) => {
+                const isFromCurrentUser = isMessageFromCurrentUser(msg.senderId, conversationData);
+                return {
+                  id: msg.id,
+                  sender: isFromCurrentUser ? "You" : "Other",
+                  senderId: msg.senderId,
+                  text: msg.message || "",
+                  time: msg.createdAt
+                    ? new Date(msg.createdAt).toLocaleTimeString()
+                    : new Date().toLocaleTimeString(),
+                  createdAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
+                  isRead: msg.isRead !== false,
+                };
+              });
+
+            if (newMessages.length > 0) {
+              console.log(`📥 Fetched ${newMessages.length} new message(s) via polling`);
+              
+              // Get the latest message to update conversations list
+              const latestMessage = newMessages[newMessages.length - 1];
+              
+              // Update conversations list with latest message
+              setConversations((prevConvs) => {
+                const updated = [...prevConvs];
+                const convIndex = updated.findIndex(
+                  (conv) => conv.id === selectedChat.id
+                );
+                if (convIndex >= 0) {
+                  updated[convIndex] = {
+                    ...updated[convIndex],
+                    lastMessage: latestMessage.text || "",
+                    lastMessageTime: latestMessage.time || new Date().toLocaleTimeString(),
+                  };
+                  // Sort conversations by last message time (most recent first)
+                  updated.sort((a, b) => {
+                    const aTime = new Date(a.lastMessageTime || 0).getTime();
+                    const bTime = new Date(b.lastMessageTime || 0).getTime();
+                    return bTime - aTime;
+                  });
+                }
+                return updated;
+              });
+              
+              // Auto-scroll to bottom when new messages arrive
+              setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+              }, 100);
+              
+              return {
+                ...prev,
+                messages: sortMessages([...prev.messages, ...newMessages]),
+              };
+            }
+            
+            return prev;
+          });
+        } catch (error) {
+          console.error("Error polling for new messages:", error);
+        }
+      };
+
+      fetchNewMessages();
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [selectedChat?.id, jwtToken]);
 
   // Load user data
   useEffect(() => {
@@ -714,20 +898,17 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
                         <div
                           key={msg?.id || i}
                           className={`flex items-start gap-3 ${
-                            msg.sender === "You" ? "flex-row-reverse" : ""
+                            msg.sender === "You" ? "justify-end" : "justify-start"
                           }`}
                         >
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 ${
-                              msg.sender === "You"
-                                ? "bg-gradient-to-r from-green-400 to-green-500"
-                                : "bg-gradient-to-r from-blue-400 to-blue-500"
-                            }`}
-                          >
-                            {msg.sender === "You"
-                              ? "Y"
-                              : selectedChat.name?.charAt(0) || "?"}
+                          {/* Avatar chỉ hiển thị cho tin nhắn của người khác */}
+                          {msg.sender !== "You" && (
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 bg-gradient-to-r from-blue-400 to-blue-500">
+                              {selectedChat.name?.charAt(0) || "?"}
                           </div>
+                          )}
+                          
+                          {/* Message bubble */}
                           <div
                             className={`rounded-lg p-3 max-w-xs ${
                               msg.sender === "You"
@@ -748,6 +929,13 @@ export const Chat = ({ mentorId, courseId, onCreateConversation }) => {
                               {msg.time}
                             </p>
                           </div>
+                          
+                          {/* Avatar chỉ hiển thị cho tin nhắn của mình */}
+                          {msg.sender === "You" && (
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 bg-gradient-to-r from-green-400 to-green-500">
+                              {userData?.fullName?.charAt(0) || userData?.username?.charAt(0) || "Y"}
+                            </div>
+                          )}
                         </div>
                       ))}
                       <div ref={messagesEndRef} />

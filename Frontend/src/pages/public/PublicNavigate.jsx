@@ -41,7 +41,7 @@ export const PublicNavigate = ({
   const navigate = useNavigate();
 
   const handleLoginGoogle = () => {
-    window.location.href = "https://edube-eqhraqdkhde2d6fx.japanwest-01.azurewebsites.net/oauth2/authorization/google";
+    window.location.href = "https://be-edube.onrender.com/oauth2/authorization/google";
   };
 
   const handleCancel = () => {

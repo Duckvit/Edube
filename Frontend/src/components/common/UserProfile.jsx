@@ -178,7 +178,7 @@ export const UserProfile = () => {
             <ArrowLeftOutlined />
             Back to Dashboard
           </button> */}
-        <div className="mb-6 flex items-center justify-between">
+        {/* <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
             <p className="text-gray-600 mt-1">
@@ -196,7 +196,7 @@ export const UserProfile = () => {
           >
             Edit Profile
           </Button>
-        </div>
+        </div> */}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">

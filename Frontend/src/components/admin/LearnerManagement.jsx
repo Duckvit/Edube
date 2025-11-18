@@ -301,7 +301,7 @@ export const User = () => {
             ? `Update Learner ${currentLearner.id}`
             : "Update Learner"
         }
-        visible={updateModalVisible}
+        open={updateModalVisible}
         onOk={handleUpdate}
         onCancel={() => setUpdateModalVisible(false)}
         okText="Update"

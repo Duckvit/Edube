@@ -389,7 +389,7 @@ export const AdminHome = () => {
                 </div>
               </div>
             }
-            bodyStyle={{ padding: '20px' }}
+            styles={{ body: { padding: '20px' } }}
           >
             <Table
               columns={coursesColumns}
@@ -419,7 +419,7 @@ export const AdminHome = () => {
                 <p className="text-xs text-gray-500 m-0 mt-1">Distribution overview</p>
               </div>
             }
-            bodyStyle={{ padding: '20px' }}
+            styles={{ body: { padding: '20px' } }}
           >
             <div style={{ height: "200px" }} className="flex items-center justify-center mb-4">
               <Pie data={pieData} options={pieOptions} />

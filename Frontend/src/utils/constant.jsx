@@ -8,6 +8,7 @@ import {
   MessageOutlined,
   TeamOutlined,
   LineChartOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
 
 export const menuNavbarItemsMentor = [
@@ -97,6 +98,16 @@ export const menuNavbarItemsAdmin = [
     label: (
       <NavLink to={path.ADMIN_COURSE_MANAGEMENT} className="text-white">
         Course
+      </NavLink>
+    ),
+    className: "text-white text-lg",
+  },
+  {
+    key: "review",
+    icon: <StarOutlined />,
+    label: (
+      <NavLink to={path.ADMIN_REVIEW_MANAGEMENT} className="text-white">
+        Review
       </NavLink>
     ),
     className: "text-white text-lg",

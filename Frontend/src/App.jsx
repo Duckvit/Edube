@@ -24,6 +24,7 @@ import {
   MentorManagement,
   LearnerDashboard,
   LearnerManagement,
+  ReviewManagement,
   Report,
   Learner,
   CourseDetail,
@@ -175,6 +176,10 @@ function App() {
           <Route
             path={path.ADMIN_MENTOR_MANAGEMENT}
             element={<MentorManagement />}
+          />
+          <Route
+            path={path.ADMIN_REVIEW_MANAGEMENT}
+            element={<ReviewManagement />}
           />
           <Route path={path.REPORT} element={<Report />} />
         </Route>

@@ -26,6 +26,7 @@ export const path = {
   ADMIN_COURSE_MANAGEMENT: "course-management",
   ADMIN_LEARNER_MANAGEMENT: "learner-management",
   ADMIN_MENTOR_MANAGEMENT: "mentor-management",
+  ADMIN_REVIEW_MANAGEMENT: "review-management",
   ADMIN_REPORT: "report",
 
   // LEARNER

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card, Button, Rate, Collapse, List, Modal } from "antd";
+import { Card, Button, Rate, Collapse, List, Modal, Tabs, Avatar } from "antd";
 import { createPayment } from "../../apis/PaymentServices";
 import {
   createEnrollment,
@@ -14,10 +14,14 @@ import {
   ArrowLeftOutlined,
   FileTextOutlined,
   MessageOutlined,
+  StarOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import useAiStore from "../../store/useAiStore";
 import { useUserStore } from "../../store/useUserStore";
 import { getCourseById as fetchCourseById } from "../../apis/CourseServices";
+import { getReviewByCourseId } from "../../apis/ReviewServices";
+import { formatDate } from "../../utils/formatDate";
 import path from "../../utils/path";
 
 const { Panel } = Collapse;
@@ -30,6 +34,9 @@ const CoursePreview = () => {
   const [error, setError] = useState(null);
   const { userData } = useUserStore();
   const [selectedLesson, setSelectedLesson] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   // ✅ Fetch dữ liệu thật từ API
   useEffect(() => {
@@ -77,6 +84,29 @@ const CoursePreview = () => {
     };
 
     loadCourse();
+  }, [id]);
+
+  // Fetch reviews for the course
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!id) return;
+      try {
+        setReviewsLoading(true);
+        const response = await getReviewByCourseId(id);
+        const reviewsData = response?.data || [];
+        // Only show active (approved) reviews
+        const activeReviews = reviewsData.filter(
+          (review) => review.status === "active"
+        );
+        setReviews(activeReviews);
+      } catch (err) {
+        console.error("Failed to fetch reviews:", err);
+        setReviews([]);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+    fetchReviews();
   }, [id]);
 
   const handleEnroll = async (courseId) => {
@@ -269,35 +299,116 @@ const CoursePreview = () => {
               </div>
             </Card>
 
-            <Card title="About this course" className="mb-6">
-              <p className="text-gray-600">{course.description}</p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {course.totalLessons}
-                  </div>
-                  <div className="text-sm text-gray-600">Lessons</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    {course.duration}
-                  </div>
-                  <div className="text-sm text-gray-600">Duration</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {course.students}
-                  </div>
-                  <div className="text-sm text-gray-600">Students</div>
-                </div>
-                {/* <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">
-                    {course.rating}/5
-                  </div>
-                  <div className="text-sm text-gray-600">Rating</div>
-                </div> */}
-              </div>
-            </Card>
+            <Tabs
+              activeKey={activeTab}
+              onChange={setActiveTab}
+              items={[
+                {
+                  key: "overview",
+                  label: "Overview",
+                  children: (
+                    <Card title="About this course" className="mb-6">
+                      <p className="text-gray-600">{course.description}</p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {course.totalLessons}
+                          </div>
+                          <div className="text-sm text-gray-600">Lessons</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">
+                            {course.duration}
+                          </div>
+                          <div className="text-sm text-gray-600">Duration</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-purple-600">
+                            {course.students}
+                          </div>
+                          <div className="text-sm text-gray-600">Students</div>
+                        </div>
+                      </div>
+                    </Card>
+                  ),
+                },
+                {
+                  key: "reviews",
+                  label: (
+                    <span className="flex items-center">
+                      <StarOutlined className="mr-2" />
+                      Reviews ({reviews.length})
+                    </span>
+                  ),
+                  children: (
+                    <Card title={`Reviews (${reviews.length})`} className="mb-6">
+                      {reviewsLoading ? (
+                        <div className="text-center py-8">
+                          <p className="text-gray-500">Loading reviews...</p>
+                        </div>
+                      ) : reviews.length === 0 ? (
+                        <div className="text-center py-8">
+                          <StarOutlined className="text-4xl text-gray-300 mb-2" />
+                          <p className="text-gray-500">
+                            No reviews yet. Be the first to review this course!
+                          </p>
+                        </div>
+                      ) : (
+                        <List
+                          dataSource={reviews}
+                          renderItem={(review) => (
+                            <List.Item>
+                              <div className="w-full">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex items-center space-x-3">
+                                    <Avatar
+                                      size={40}
+                                      icon={<UserOutlined />}
+                                      className="bg-gradient-to-r from-purple-600 to-blue-600"
+                                    />
+                                    <div>
+                                      <div className="font-semibold text-gray-900">
+                                        Learner #{review.learner?.id || "Unknown"}
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {formatDate(review.createdAt)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center">
+                                    <Rate
+                                      disabled
+                                      defaultValue={review.rating || 0}
+                                      className="text-sm"
+                                    />
+                                    <span className="ml-2 font-semibold text-gray-700">
+                                      {review.rating}/5
+                                    </span>
+                                  </div>
+                                </div>
+                                {review.reviewText && (
+                                  <div className="mt-3 p-4 bg-gray-50 rounded-lg">
+                                    <p className="text-gray-700 whitespace-pre-wrap">
+                                      {review.reviewText}
+                                    </p>
+                                  </div>
+                                )}
+                                {review.helpfulCount > 0 && (
+                                  <div className="mt-2 text-sm text-gray-500">
+                                    {review.helpfulCount} people found this helpful
+                                  </div>
+                                )}
+                              </div>
+                            </List.Item>
+                          )}
+                        />
+                      )}
+                    </Card>
+                  ),
+                },
+              ]}
+              size="large"
+            />
           </div>
 
           {/* Right: Curriculum + Action */}

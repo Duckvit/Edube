@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Loading from "../common/Loading";
-import { statsData, activitiesData } from "../../utils/mockData";
-import { BookOpen, Users, TrendingUp, Star } from "lucide-react";
+import { BookOpen, Users, FileText, Star } from "lucide-react";
 import { getAllActiveCoursesByMentorId } from "../../apis/CourseServices";
 import { getConversations, getMessages } from "../../apis/ChatServices";
 import { useUserStore } from "../../store/useUserStore";
@@ -13,11 +12,11 @@ import { path } from "../../utils/path";
 export const Dashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState(null);
   const [courses, setCourses] = useState([]);
-  const [messages, setMessages] = useState([]);
   const [totalActiveCourses, setTotalActiveCourses] = useState(0);
   const [totalLearners, setTotalLearners] = useState(0);
+  const [totalLessons, setTotalLessons] = useState(0);
+  const [averageRating, setAverageRating] = useState(0);
   const [error, setError] = useState(null);
   const [recentMessages, setRecentMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -175,6 +174,47 @@ export const Dashboard = () => {
         console.log("API response allActiveCourses: ", data);
         setTotalActiveCourses(data.totalActiveCourses || 0);
         setTotalLearners(data.totalLearners || 0);
+        
+        // Calculate total lessons and average rating from all courses
+        const coursesList = data?.courses || [];
+        const totalLessonsCount = coursesList.reduce((sum, course) => {
+          return sum + (course.totalLessons || 0);
+        }, 0);
+        setTotalLessons(totalLessonsCount);
+        
+        // Calculate average rating from courses
+        // Try to get rating from course.rating first, or calculate from reviews if available
+        let totalRating = 0;
+        let coursesWithRatings = 0;
+        
+        coursesList.forEach(course => {
+          let courseRating = 0;
+          
+          // First try course.rating field
+          if (course.rating && course.rating > 0) {
+            courseRating = course.rating;
+          } 
+          // If not available, try to calculate from reviews
+          else if (course.reviews && Array.isArray(course.reviews) && course.reviews.length > 0) {
+            const activeReviews = course.reviews.filter(r => r.status === 'active');
+            if (activeReviews.length > 0) {
+              const sumRating = activeReviews.reduce((sum, review) => sum + (review.rating || 0), 0);
+              courseRating = sumRating / activeReviews.length;
+            }
+          }
+          
+          if (courseRating > 0) {
+            totalRating += courseRating;
+            coursesWithRatings++;
+          }
+        });
+        
+        if (coursesWithRatings > 0) {
+          const avgRating = totalRating / coursesWithRatings;
+          setAverageRating(parseFloat(avgRating.toFixed(1)));
+        } else {
+          setAverageRating(0);
+        }
       } catch (err) {
         console.error("Lỗi khi gọi API All Courses:", err);
         setError(err.message || "Đã xảy ra lỗi");
@@ -203,7 +243,7 @@ export const Dashboard = () => {
       )}
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">
@@ -212,10 +252,9 @@ export const Dashboard = () => {
               <p className="text-3xl font-bold text-gray-900">
                 {totalActiveCourses}
               </p>
-              {/* <p className="text-sm text-green-600 flex items-center mt-1">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                +3 new this month
-              </p> */}
+              <p className="text-xs text-gray-500 mt-1">
+                Published courses
+              </p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
               <BookOpen className="w-6 h-6 text-purple-600" />
@@ -223,7 +262,7 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">
@@ -232,10 +271,9 @@ export const Dashboard = () => {
               <p className="text-3xl font-bold text-gray-900">
                 {totalLearners}
               </p>
-              {/* <p className="text-sm text-green-600 flex items-center mt-1">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                +12% from last month
-              </p> */}
+              <p className="text-xs text-gray-500 mt-1">
+                Enrolled learners
+              </p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <Users className="w-6 h-6 text-blue-600" />
@@ -243,40 +281,40 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Avg. Rating</p>
-              <p className="text-3xl font-bold text-gray-900">
-                {stats?.rating}
+              <p className="text-sm font-medium text-gray-600">
+                Total Lessons
               </p>
-              {/* <p className="text-sm text-yellow-600 flex items-center mt-1">
-                <Star className="w-4 h-4 mr-1 fill-current" />
-                Based on 892 reviews
-              </p> */}
+              <p className="text-3xl font-bold text-gray-900">
+                {totalLessons}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Across all courses
+              </p>
             </div>
-            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Star className="w-6 h-6 text-yellow-600" />
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <FileText className="w-6 h-6 text-green-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">
-                Revenue Earned
+                Average Rating
               </p>
               <p className="text-3xl font-bold text-gray-900">
-                {stats?.revenue}
+                {averageRating > 0 ? averageRating.toFixed(1) : "0"}
               </p>
-              {/* <p className="text-sm text-green-600 flex items-center mt-1">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                +8% from last month
-              </p> */}
+              <p className="text-xs text-gray-500 mt-1">
+                {averageRating > 0 ? "Out of 5.0" : "No ratings yet"}
+              </p>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-green-600" />
+            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+              <Star className="w-6 h-6 text-yellow-600 fill-yellow-600" />
             </div>
           </div>
         </div>

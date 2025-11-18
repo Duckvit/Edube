@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { getAllCourses } from "../../apis/CourseServices";
 import { createPayment } from "../../apis/PaymentServices";
 import {
@@ -7,6 +7,7 @@ import {
 } from "../../apis/EnrollmentServices";
 import { getLessonProgressByEnrollment } from "../../apis/LessonProgressServices";
 import { toast } from "react-toastify";
+import { logger } from "../../utils/logger";
 import {
   Card,
   Tabs,
@@ -72,13 +73,13 @@ export const LearnerDashboard = () => {
 
         setLoading(true);
         const data = await getAllCourses(0, 100, token);
-        console.log("📘 API response getAllCourses:", data);
+        logger.log("API response getAllCourses:", data);
 
         const coursesData = data?.content || [];
         setAllCourses(coursesData);
       } catch (err) {
-        console.error("Lỗi khi gọi API All Courses:", err);
-        setError(err.message || "Đã xảy ra lỗi");
+        logger.error("Error fetching all courses:", err);
+        setError(err.message || "An error occurred");
       } finally {
         setLoading(false);
       }
@@ -92,15 +93,14 @@ export const LearnerDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const learnerId = userData?.learner?.id;
-      console.log("userData", userData);
       if (!token || !learnerId) {
-        setError("Thiếu token hoặc learnerId");
+        setError("Missing token or learnerId");
         return;
       }
 
       setLoading(true);
       const data = await getEnrollmentsByLearner(learnerId, token);
-      console.log("📘 Enrolled Courses API response:", data);
+      logger.log("Enrolled Courses API response:", data);
 
       // Dữ liệu API trả về là 1 array chứa enrollments
       const enrollments = Array.isArray(data)
@@ -148,10 +148,10 @@ export const LearnerDashboard = () => {
       });
 
       setEnrolledCourses(mappedCourses);
-      console.log("✅ mapped enrolled courses:", mappedCourses);
+      logger.log("Mapped enrolled courses:", mappedCourses);
     } catch (err) {
-      console.error("Lỗi khi gọi API Enrolled Courses:", err);
-      setError(err.message || "Đã xảy ra lỗi");
+      logger.error("Error fetching enrolled courses:", err);
+      setError(err.message || "An error occurred");
     } finally {
       setLoading(false);
     }
@@ -171,7 +171,7 @@ export const LearnerDashboard = () => {
 
     // listen to enrollment changes from other parts of the app (CourseDetail)
     const handler = (e) => {
-      console.log("Received enrollment:updated event", e?.detail);
+      logger.log("Received enrollment:updated event", e?.detail);
       fetchEnrollCourses();
     };
     window.addEventListener("enrollment:updated", handler);
@@ -180,11 +180,9 @@ export const LearnerDashboard = () => {
     };
   }, [userData, location]);
 
-  const handleEnroll = async (courseId) => {
+  const handleEnroll = useCallback(async (courseId) => {
     try {
       const token = localStorage.getItem("token");
-      console.log(token);
-
       if (!token) {
         toast.error("Please log in before enrolling");
         return;
@@ -200,10 +198,10 @@ export const LearnerDashboard = () => {
         toast.error("Failed to create payment link");
       }
     } catch (error) {
-      console.error(error);
+      logger.error("Error creating payment link:", error);
       toast.error("Error creating payment link");
     }
-  };
+  }, []);
 
   const handleContinueCourse = (courseId, enrollmentId) => {
     // Prefer passing enrollmentId so CourseDetail can load the correct enrollment context
@@ -250,16 +248,16 @@ export const LearnerDashboard = () => {
     }
   };
 
-  const filteredEnrolledCourses = enrolledCourses.filter((course) => {
-    if (myLearningFilter === "all") return true;
-    if (myLearningFilter === "in-progress")
-      return course.status === "in-progress";
-    if (myLearningFilter === "saved") return course.status === "saved";
-    if (myLearningFilter === "completed") return course.status === "completed";
-    return true;
-  });
-
-  console.log("📘 Filtered enrolled courses:", filteredEnrolledCourses);
+  const filteredEnrolledCourses = useMemo(() => {
+    return enrolledCourses.filter((course) => {
+      if (myLearningFilter === "all") return true;
+      if (myLearningFilter === "in-progress")
+        return course.status === "in-progress";
+      if (myLearningFilter === "saved") return course.status === "saved";
+      if (myLearningFilter === "completed") return course.status === "completed";
+      return true;
+    });
+  }, [enrolledCourses, myLearningFilter]);
   const filteredAllCourses = useMemo(() => {
     // exclude courses the learner already enrolled in
     const enrolledIds = new Set((enrolledCourses || []).map((c) => c.id));
@@ -280,8 +278,6 @@ export const LearnerDashboard = () => {
       });
   }, [allCourses, searchText, categoryFilter, levelFilter, enrolledCourses]);
 
-  // console.log("📘 All courses:", allCourses);
-  // console.log("📘 Filtered courses:", filteredAllCourses);
 
   const categories = React.useMemo(() => {
     const s = new Set();

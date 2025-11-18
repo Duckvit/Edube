@@ -41,8 +41,9 @@ import {
 import { useUserStore } from "../../store/useUserStore";
 import useAiStore from "../../store/useAiStore";
 import { createConversation } from "../../apis/ChatServices";
-import { createCourseReview } from "../../apis/ReviewServices";
+import { createCourseReview, getReviewByCourseId } from "../../apis/ReviewServices";
 import { toast } from "react-toastify";
+import { formatDate } from "../../utils/formatDate";
 import path from "../../utils/path";
 
 const { TextArea } = Input;
@@ -69,7 +70,10 @@ const CourseDetail = () => {
   const [lessonProgressMap, setLessonProgressMap] = useState(new Map()); // Map lessonId -> progress data
   const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
   const [reviewForm] = Form.useForm();
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const userData = useUserStore((s) => s.userData);
+  const role = useUserStore((s) => s.role);
   const firstSection = course.curriculum?.[0];
   const firstLesson = firstSection?.lessons?.[currentLesson];
   const selectedLesson =
@@ -370,6 +374,29 @@ const CourseDetail = () => {
     };
   }, [courseId, userData]);
 
+  // Fetch reviews for the course
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!courseId) return;
+      try {
+        setReviewsLoading(true);
+        const response = await getReviewByCourseId(courseId);
+        const reviewsData = response?.data || [];
+        // Only show active (approved) reviews
+        const activeReviews = reviewsData.filter(
+          (review) => review.status === "active"
+        );
+        setReviews(activeReviews);
+      } catch (err) {
+        console.error("Failed to fetch reviews:", err);
+        setReviews([]);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+    fetchReviews();
+  }, [courseId]);
+
   const OverviewTab = () => (
     <div className="space-y-6">
       <Card title="About this course">
@@ -586,11 +613,85 @@ const CourseDetail = () => {
     </div>
   );
 
+  const ReviewsTab = () => (
+    <Card title={`Reviews (${reviews.length})`}>
+      {reviewsLoading ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500">Loading reviews...</p>
+        </div>
+      ) : reviews.length === 0 ? (
+        <div className="text-center py-8">
+          <StarOutlined className="text-4xl text-gray-300 mb-2" />
+          <p className="text-gray-500">No reviews yet. Be the first to review this course!</p>
+        </div>
+      ) : (
+        <List
+          dataSource={reviews}
+          renderItem={(review) => (
+            <List.Item>
+              <div className="w-full">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center space-x-3">
+                    <Avatar
+                      size={40}
+                      icon={<UserOutlined />}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600"
+                    />
+                    <div>
+                      <div className="font-semibold text-gray-900">
+                        Learner #{review.learner?.id || "Unknown"}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {formatDate(review.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <Rate
+                      disabled
+                      defaultValue={review.rating || 0}
+                      className="text-sm"
+                    />
+                    <span className="ml-2 font-semibold text-gray-700">
+                      {review.rating}/5
+                    </span>
+                  </div>
+                </div>
+                {review.reviewText && (
+                  <div className="mt-3 p-4 bg-gray-50 rounded-lg">
+                    <p className="text-gray-700 whitespace-pre-wrap">
+                      {review.reviewText}
+                    </p>
+                  </div>
+                )}
+                {review.helpfulCount > 0 && (
+                  <div className="mt-2 text-sm text-gray-500">
+                    {review.helpfulCount} people found this helpful
+                  </div>
+                )}
+              </div>
+            </List.Item>
+          )}
+        />
+      )}
+    </Card>
+  );
+
   const tabItems = [
     {
       key: "overview",
       label: "Overview",
       children: <OverviewTab />,
+    },
+    {
+      key: "reviews",
+      label: (
+        <span className="flex items-center">
+          <StarOutlined className="mr-2" />
+          Reviews ({reviews.length})
+        </span>
+      ),
+      children: <ReviewsTab />,
     },
     // {
     //   key: "materials",
@@ -1228,7 +1329,7 @@ const CourseDetail = () => {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        toast.error("Vui lòng đăng nhập để đánh giá");
+        toast.error("Please login to create review");
         return;
       }
 
@@ -1238,18 +1339,26 @@ const CourseDetail = () => {
         reviewText: values.reviewText || "",
       };
 
-      const response = await createCourseReview(reviewData, token);
-      
-      if (response.statusCode === 201) {
-        toast.success("Đánh giá đã được gửi thành công!");
+      const response = await createCourseReview(token, reviewData);
+
+      if (response.statusCode === 201 || response.statusCode === 200) {
+        toast.success("Review sent successfully! It will be visible after admin approval.");
         setIsReviewModalVisible(false);
         reviewForm.resetFields();
+        // Refresh reviews list (though the new review won't show until approved)
+        const refreshResponse = await getReviewByCourseId(courseId);
+        const reviewsData = refreshResponse?.data || [];
+        const activeReviews = reviewsData.filter(
+          (review) => review.status === "active"
+        );
+        setReviews(activeReviews);
       } else {
-        toast.error(response.message || "Có lỗi xảy ra khi gửi đánh giá");
+        toast.error(response.message || "Errror while create review");
       }
     } catch (error) {
       console.error("Error submitting review:", error);
-      const errorMessage = error.response?.data?.message || "Có lỗi xảy ra khi gửi đánh giá";
+      const errorMessage =
+        error.response?.data?.message || "Error while sent review";
       toast.error(errorMessage);
     }
   };
@@ -1262,11 +1371,11 @@ const CourseDetail = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div className="flex-1">
               <button
-                onClick={() => navigate(`/learner`)}
+                onClick={() => navigate(-1)}
                 className="flex items-center gap-2 text-blue-600 hover:underline cursor-pointer"
               >
                 <ArrowLeftOutlined />
-                Back to Dashboard
+                Back
               </button>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {course.title}

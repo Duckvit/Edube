@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { getLearner } from "../../apis/MentorServices";
 import { useUserStore } from "../../store/useUserStore";
+import { logger } from "../../utils/logger";
 import {
   Search,
   Filter,
-  Download,
   ChevronLeft,
   ChevronRight,
   User,
@@ -23,19 +22,26 @@ export const Learner = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
+  const mentorId = userData?.mentor?.id;
+
   useEffect(() => {
     const fetchLearners = async () => {
+      if (!mentorId) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         const token = localStorage.getItem("token");
-        const mentorId = userData?.mentor?.id;
-        if (!mentorId) {
+        if (!token) {
+          logger.warn("No token found");
           setLoading(false);
           return;
         }
 
         const data = await getLearner(page, size, mentorId, token);
-        console.log("📘 Learners data:", data);
+        logger.log("Learners data:", data);
 
         // Map dữ liệu đúng theo API trả về
         const mappedLearners = (data.learners || []).map((l) => ({
@@ -53,7 +59,7 @@ export const Learner = () => {
         setTotalPages(data.totalPages || 0);
         setTotalElements(data.totalElements || 0);
       } catch (err) {
-        console.error("❌ Lỗi khi gọi API getLearner:", err);
+        logger.error("Error fetching learners:", err);
         setLearners([]);
       } finally {
         setLoading(false);
@@ -61,30 +67,34 @@ export const Learner = () => {
     };
 
     fetchLearners();
-  }, [page, size, userData?.mentor?.id]);
+  }, [page, size, mentorId]);
 
-  // Filter learners based on search query
-  const filteredLearners = learners.filter((learner) => {
+  // Memoize filtered learners
+  const filteredLearners = useMemo(() => {
+    if (!searchQuery) return learners;
+    
     const query = searchQuery.toLowerCase();
-    return (
-      learner.fullName.toLowerCase().includes(query) ||
-      learner.email.toLowerCase().includes(query) ||
-      learner.majorField.toLowerCase().includes(query) ||
-      learner.educationLevel.toLowerCase().includes(query)
-    );
-  });
+    return learners.filter((learner) => {
+      return (
+        learner.fullName.toLowerCase().includes(query) ||
+        learner.email.toLowerCase().includes(query) ||
+        learner.majorField.toLowerCase().includes(query) ||
+        learner.educationLevel.toLowerCase().includes(query)
+      );
+    });
+  }, [learners, searchQuery]);
 
-  const handlePreviousPage = () => {
+  const handlePreviousPage = useCallback(() => {
     if (page > 0) {
       setPage(page - 1);
     }
-  };
+  }, [page]);
 
-  const handleNextPage = () => {
+  const handleNextPage = useCallback(() => {
     if (page < totalPages - 1) {
       setPage(page + 1);
     }
-  };
+  }, [page, totalPages]);
 
   return (
     <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
@@ -158,9 +168,6 @@ export const Learner = () => {
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Joined Date
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Actions
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
@@ -221,18 +228,6 @@ export const Learner = () => {
                               weekday: "short",
                             }
                           )}
-                        </div>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-3">
-                          {/* <button className="text-sm font-medium text-purple-600 hover:text-purple-800 hover:underline transition-colors">
-                            View
-                          </button> */}
-                          <button className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors">
-                            Message
-                          </button>
                         </div>
                       </td>
                     </tr>

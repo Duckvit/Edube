@@ -13,6 +13,7 @@ export { default as AdminHome } from "./admin/AdminHome";
 export { default as CourseManagement } from "./admin/CourseManagement";
 export { default as LearnerManagement } from "./admin/LearnerManagement";
 export { default as MentorManagement } from "./admin/MentorManagement";
+export { default as ReviewManagement } from "./admin/ReviewManagement";
 export { default as Report } from "./admin/Report";
 
 // mentor

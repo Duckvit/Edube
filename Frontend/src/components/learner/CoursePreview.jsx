@@ -109,6 +109,72 @@ const CoursePreview = () => {
     fetchReviews();
   }, [id]);
 
+  const ReviewsTab = () => (
+    <Card title={`Reviews (${reviews.length})`} className="mb-6">
+      {reviewsLoading ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500">Loading reviews...</p>
+        </div>
+      ) : reviews.length === 0 ? (
+        <div className="text-center py-8">
+          <StarOutlined className="text-4xl text-gray-300 mb-2" />
+          <p className="text-gray-500">
+            No reviews yet. Be the first to review this course!
+          </p>
+        </div>
+      ) : (
+        <List
+          dataSource={reviews}
+          renderItem={(review) => (
+            <List.Item>
+              <div className="w-full">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center space-x-3">
+                    <Avatar
+                      size={40}
+                      icon={<UserOutlined />}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600"
+                    />
+                    <div>
+                      <div className="font-semibold text-gray-900">
+                        Learner #{review.learner?.id || "Unknown"}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {formatDate(review.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <Rate
+                      disabled
+                      defaultValue={review.rating || 0}
+                      className="text-sm"
+                    />
+                    <span className="ml-2 font-semibold text-gray-700">
+                      {review.rating}/5
+                    </span>
+                  </div>
+                </div>
+                {review.reviewText && (
+                  <div className="mt-3 p-4 bg-gray-50 rounded-lg">
+                    <p className="text-gray-700 whitespace-pre-wrap">
+                      {review.reviewText}
+                    </p>
+                  </div>
+                )}
+                {review.helpfulCount > 0 && (
+                  <div className="mt-2 text-sm text-gray-500">
+                    {review.helpfulCount} people found this helpful
+                  </div>
+                )}
+              </div>
+            </List.Item>
+          )}
+        />
+      )}
+    </Card>
+  );
+
   const handleEnroll = async (courseId) => {
     try {
       const token = localStorage.getItem("token");
@@ -208,7 +274,7 @@ const CoursePreview = () => {
               </h1>
               <div className="flex items-center gap-3 mb-4">
                 <p className="text-gray-600">by {course.mentor}</p>
-                {course.mentorId && (
+                {/* {course.mentorId && (
                   <Button
                     type="primary"
                     icon={<MessageOutlined />}
@@ -250,7 +316,7 @@ const CoursePreview = () => {
                   >
                     Chat
                   </Button>
-                )}
+                )} */}
               </div>
               <div className="flex items-center space-x-6 text-sm text-gray-600">
                 {/* <div className="flex items-center">
@@ -340,71 +406,7 @@ const CoursePreview = () => {
                       Reviews ({reviews.length})
                     </span>
                   ),
-                  children: (
-                    <Card title={`Reviews (${reviews.length})`} className="mb-6">
-                      {reviewsLoading ? (
-                        <div className="text-center py-8">
-                          <p className="text-gray-500">Loading reviews...</p>
-                        </div>
-                      ) : reviews.length === 0 ? (
-                        <div className="text-center py-8">
-                          <StarOutlined className="text-4xl text-gray-300 mb-2" />
-                          <p className="text-gray-500">
-                            No reviews yet. Be the first to review this course!
-                          </p>
-                        </div>
-                      ) : (
-                        <List
-                          dataSource={reviews}
-                          renderItem={(review) => (
-                            <List.Item>
-                              <div className="w-full">
-                                <div className="flex items-start justify-between mb-2">
-                                  <div className="flex items-center space-x-3">
-                                    <Avatar
-                                      size={40}
-                                      icon={<UserOutlined />}
-                                      className="bg-gradient-to-r from-purple-600 to-blue-600"
-                                    />
-                                    <div>
-                                      <div className="font-semibold text-gray-900">
-                                        Learner #{review.learner?.id || "Unknown"}
-                                      </div>
-                                      <div className="text-sm text-gray-500">
-                                        {formatDate(review.createdAt)}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center">
-                                    <Rate
-                                      disabled
-                                      defaultValue={review.rating || 0}
-                                      className="text-sm"
-                                    />
-                                    <span className="ml-2 font-semibold text-gray-700">
-                                      {review.rating}/5
-                                    </span>
-                                  </div>
-                                </div>
-                                {review.reviewText && (
-                                  <div className="mt-3 p-4 bg-gray-50 rounded-lg">
-                                    <p className="text-gray-700 whitespace-pre-wrap">
-                                      {review.reviewText}
-                                    </p>
-                                  </div>
-                                )}
-                                {review.helpfulCount > 0 && (
-                                  <div className="mt-2 text-sm text-gray-500">
-                                    {review.helpfulCount} people found this helpful
-                                  </div>
-                                )}
-                              </div>
-                            </List.Item>
-                          )}
-                        />
-                      )}
-                    </Card>
-                  ),
+                  children: <ReviewsTab />,
                 },
               ]}
               size="large"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { getAllCourses } from "../../apis/CourseServices";
 import { createPayment } from "../../apis/PaymentServices";
 import {
@@ -6,8 +6,8 @@ import {
   createFreeEnrollments,
 } from "../../apis/EnrollmentServices";
 import { getLessonProgressByEnrollment } from "../../apis/LessonProgressServices";
+import { getAvgRating } from "../../apis/ReviewServices";
 import { toast } from "react-toastify";
-import { logger } from "../../utils/logger";
 import {
   Card,
   Tabs,
@@ -48,6 +48,7 @@ export const LearnerDashboard = () => {
   const [courses, setCourses] = useState(null);
   const [allCourses, setAllCourses] = useState([]);
   const [enrolledCourses, setEnrolledCourses] = useState([]);
+  const [courseRatings, setCourseRatings] = useState({});
 
   const userData = useUserStore((s) => s.userData);
   const searchInputRef = useRef(null);
@@ -62,6 +63,47 @@ export const LearnerDashboard = () => {
     }, 0);
   };
 
+  // Fetch ratings for all courses
+  const fetchCourseRatings = async (coursesList) => {
+    const jwtToken = localStorage.getItem("token");
+    if (!jwtToken || !coursesList || coursesList.length === 0) {
+      return;
+    }
+
+    try {
+      const ratingPromises = coursesList.map(async (course) => {
+        try {
+          const response = await getAvgRating(course.id, jwtToken);
+          if (response?.course) {
+            return {
+              courseId: course.id,
+              averageRating: response.course.averageRating || 0,
+              totalReviews: response.course.totalReviews || 0,
+            };
+          }
+          return null;
+        } catch (err) {
+          console.error(`Error fetching rating for course ${course.id}:`, err);
+          return null;
+        }
+      });
+
+      const ratings = await Promise.all(ratingPromises);
+      const ratingsMap = {};
+      ratings.forEach((rating) => {
+        if (rating) {
+          ratingsMap[rating.courseId] = {
+            averageRating: rating.averageRating,
+            totalReviews: rating.totalReviews,
+          };
+        }
+      });
+      setCourseRatings(ratingsMap);
+    } catch (err) {
+      console.error("Error fetching course ratings:", err);
+    }
+  };
+
   useEffect(() => {
     const fetchAllCourses = async () => {
       try {
@@ -73,13 +115,22 @@ export const LearnerDashboard = () => {
 
         setLoading(true);
         const data = await getAllCourses(0, 100, token);
-        logger.log("API response getAllCourses:", data);
+        console.log("📘 API response getAllCourses:", data);
 
         const coursesData = data?.content || [];
-        setAllCourses(coursesData);
+        // Chỉ lấy các courses có status là "active"
+        const activeCourses = coursesData.filter(
+          (course) => String(course.status || "").toLowerCase() === "active"
+        );
+        setAllCourses(activeCourses);
+
+        // Fetch ratings for all courses
+        if (activeCourses.length > 0) {
+          fetchCourseRatings(activeCourses);
+        }
       } catch (err) {
-        logger.error("Error fetching all courses:", err);
-        setError(err.message || "An error occurred");
+        console.error("Lỗi khi gọi API All Courses:", err);
+        setError(err.message || "Đã xảy ra lỗi");
       } finally {
         setLoading(false);
       }
@@ -93,14 +144,15 @@ export const LearnerDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const learnerId = userData?.learner?.id;
+      console.log("userData", userData);
       if (!token || !learnerId) {
-        setError("Missing token or learnerId");
+        setError("Thiếu token hoặc learnerId");
         return;
       }
 
       setLoading(true);
       const data = await getEnrollmentsByLearner(learnerId, token);
-      logger.log("Enrolled Courses API response:", data);
+      console.log("📘 Enrolled Courses API response:", data);
 
       // Dữ liệu API trả về là 1 array chứa enrollments
       const enrollments = Array.isArray(data)
@@ -148,10 +200,10 @@ export const LearnerDashboard = () => {
       });
 
       setEnrolledCourses(mappedCourses);
-      logger.log("Mapped enrolled courses:", mappedCourses);
+      console.log("✅ mapped enrolled courses:", mappedCourses);
     } catch (err) {
-      logger.error("Error fetching enrolled courses:", err);
-      setError(err.message || "An error occurred");
+      console.error("Lỗi khi gọi API Enrolled Courses:", err);
+      setError(err.message || "Đã xảy ra lỗi");
     } finally {
       setLoading(false);
     }
@@ -171,7 +223,7 @@ export const LearnerDashboard = () => {
 
     // listen to enrollment changes from other parts of the app (CourseDetail)
     const handler = (e) => {
-      logger.log("Received enrollment:updated event", e?.detail);
+      console.log("Received enrollment:updated event", e?.detail);
       fetchEnrollCourses();
     };
     window.addEventListener("enrollment:updated", handler);
@@ -180,9 +232,11 @@ export const LearnerDashboard = () => {
     };
   }, [userData, location]);
 
-  const handleEnroll = useCallback(async (courseId) => {
+  const handleEnroll = async (courseId) => {
     try {
       const token = localStorage.getItem("token");
+      console.log(token);
+
       if (!token) {
         toast.error("Please log in before enrolling");
         return;
@@ -198,10 +252,10 @@ export const LearnerDashboard = () => {
         toast.error("Failed to create payment link");
       }
     } catch (error) {
-      logger.error("Error creating payment link:", error);
+      console.error(error);
       toast.error("Error creating payment link");
     }
-  }, []);
+  };
 
   const handleContinueCourse = (courseId, enrollmentId) => {
     // Prefer passing enrollmentId so CourseDetail can load the correct enrollment context
@@ -248,16 +302,16 @@ export const LearnerDashboard = () => {
     }
   };
 
-  const filteredEnrolledCourses = useMemo(() => {
-    return enrolledCourses.filter((course) => {
-      if (myLearningFilter === "all") return true;
-      if (myLearningFilter === "in-progress")
-        return course.status === "in-progress";
-      if (myLearningFilter === "saved") return course.status === "saved";
-      if (myLearningFilter === "completed") return course.status === "completed";
-      return true;
-    });
-  }, [enrolledCourses, myLearningFilter]);
+  const filteredEnrolledCourses = enrolledCourses.filter((course) => {
+    if (myLearningFilter === "all") return true;
+    if (myLearningFilter === "in-progress")
+      return course.status === "in-progress";
+    if (myLearningFilter === "saved") return course.status === "saved";
+    if (myLearningFilter === "completed") return course.status === "completed";
+    return true;
+  });
+
+  console.log("📘 Filtered enrolled courses:", filteredEnrolledCourses);
   const filteredAllCourses = useMemo(() => {
     // exclude courses the learner already enrolled in
     const enrolledIds = new Set((enrolledCourses || []).map((c) => c.id));
@@ -278,6 +332,8 @@ export const LearnerDashboard = () => {
       });
   }, [allCourses, searchText, categoryFilter, levelFilter, enrolledCourses]);
 
+  // console.log("📘 All courses:", allCourses);
+  // console.log("📘 Filtered courses:", filteredAllCourses);
 
   const categories = React.useMemo(() => {
     const s = new Set();
@@ -319,14 +375,6 @@ export const LearnerDashboard = () => {
           >
             In Progress (
             {enrolledCourses.filter((c) => c.status === "in-progress").length})
-          </Button>
-          <Button
-            type={myLearningFilter === "saved" ? "primary" : "default"}
-            icon={<HeartOutlined />}
-            onClick={() => setMyLearningFilter("saved")}
-            className={myLearningFilter === "saved" ? "bg-blue-600" : ""}
-          >
-            Saved ({enrolledCourses.filter((c) => c.status === "saved").length})
           </Button>
           <Button
             type={myLearningFilter === "completed" ? "primary" : "default"}
@@ -552,6 +600,19 @@ export const LearnerDashboard = () => {
                 <p className="text-sm text-gray-600 mb-2">
                   by {course?.mentor?.user?.username}
                 </p>
+                {courseRatings[course.id] && courseRatings[course.id].totalReviews > 0 && (
+                  <div className="flex items-center mb-2">
+                    <Rate
+                      disabled
+                      value={courseRatings[course.id].averageRating}
+                      allowHalf
+                      className="text-xs"
+                    />
+                    <span className="text-sm text-gray-600 ml-2">
+                      ({courseRatings[course.id].averageRating.toFixed(1)}) - {courseRatings[course.id].totalReviews} {courseRatings[course.id].totalReviews === 1 ? "review" : "reviews"}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-sm text-gray-600 mb-1">
                     {course?.sections?.length || 0} sections •

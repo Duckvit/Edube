@@ -25,6 +25,8 @@ import {
   TrophyOutlined,
 } from "@ant-design/icons";
 import { getAllActiveCoursesByMentorId } from "../../apis/CourseServices";
+import { getEnrollmentsByLearner } from "../../apis/EnrollmentServices";
+import { getLessonProgressByEnrollment } from "../../apis/LessonProgressServices";
 import { updateLearner } from "../../apis/LearnerServices";
 
 const { Option } = Select;
@@ -40,6 +42,11 @@ export const UserProfile = () => {
 
   const [profile, setProfile] = useState(null);
   const [mentorStats, setMentorStats] = useState(null);
+  const [learnerStats, setLearnerStats] = useState({
+    coursesEnrolled: 0,
+    coursesCompleted: 0,
+    hoursLearned: 0,
+  });
 
   // effectiveRole prefers backend-detected role (profile.learner/profile.mentor), then displayRole, then store role
   const effectiveRole =
@@ -85,8 +92,9 @@ export const UserProfile = () => {
         setProfile(user);
 
         // derive display role from returned user if not already set
+        let derived = role || "learner";
         if (user) {
-          const derived = user.learner
+          derived = user.learner
             ? "learner"
             : user.mentor
             ? "mentor"
@@ -105,6 +113,87 @@ export const UserProfile = () => {
             }
           } catch (err) {
             console.error("Failed to fetch mentor stats for profile", err);
+          }
+        }
+
+        // If learner, fetch learner stats (enrollments, completed courses, hours learned)
+        if (user && (user.learner || derived === "learner")) {
+          try {
+            const learnerId = (user.learner && user.learner.id) || user.id;
+            const token = localStorage.getItem("token");
+            if (learnerId && token) {
+              // Fetch enrollments
+              const enrollments = await getEnrollmentsByLearner(learnerId, token);
+              const enrollmentsList = Array.isArray(enrollments)
+                ? enrollments
+                : enrollments?.content || enrollments?.data || [];
+
+              console.log("📊 Learner Statistics - Enrollments:", enrollmentsList);
+
+              const coursesEnrolled = enrollmentsList.length;
+              
+              // Count completed courses - check status (case-insensitive) and progressPercentage
+              const coursesCompleted = enrollmentsList.filter((enroll) => {
+                const status = String(enroll.status || "").toLowerCase();
+                const isCompletedByStatus = status === "completed";
+                const isCompletedByProgress = (enroll.progressPercentage || 0) >= 100;
+                const isCompleted = isCompletedByStatus || isCompletedByProgress;
+                
+                console.log(`Course ${enroll.course?.title || enroll.course?.id}:`, {
+                  status: enroll.status,
+                  statusLower: status,
+                  progressPercentage: enroll.progressPercentage,
+                  isCompletedByStatus,
+                  isCompletedByProgress,
+                  isCompleted,
+                });
+                
+                return isCompleted;
+              }).length;
+
+              console.log("📊 Learner Statistics Result:", {
+                coursesEnrolled,
+                coursesCompleted,
+              });
+
+              // Calculate total hours learned from lesson progress
+              let totalHours = 0;
+              try {
+                const progressPromises = enrollmentsList.map(async (enroll) => {
+                  try {
+                    const progressList = await getLessonProgressByEnrollment(
+                      enroll.id,
+                      token
+                    );
+                    const progressArray = Array.isArray(progressList)
+                      ? progressList
+                      : progressList?.content || progressList?.data || [];
+                    
+                    // Sum up timeSpentMinutes from all lesson progress
+                    return progressArray.reduce((sum, progress) => {
+                      return sum + (progress.timeSpentMinutes || 0);
+                    }, 0);
+                  } catch (err) {
+                    console.warn("Failed to fetch lesson progress for enrollment", enroll.id);
+                    return 0;
+                  }
+                });
+
+                const hoursArray = await Promise.all(progressPromises);
+                const totalMinutes = hoursArray.reduce((sum, minutes) => sum + minutes, 0);
+                totalHours = Math.round((totalMinutes / 60) * 10) / 10; // Round to 1 decimal place
+              } catch (err) {
+                console.error("Failed to calculate hours learned", err);
+              }
+
+              setLearnerStats({
+                coursesEnrolled,
+                coursesCompleted,
+                hoursLearned: totalHours,
+              });
+            }
+          } catch (err) {
+            console.error("Failed to fetch learner stats for profile", err);
           }
         }
       } catch (err) {
@@ -257,7 +346,7 @@ export const UserProfile = () => {
                   {effectiveRole === "learner" ? "Learner" : "Mentor"}
                 </div>
 
-                {effectiveRole === "mentor" && (
+                {/* {effectiveRole === "mentor" && (
                   <div className="flex items-center justify-center bg-amber-50 px-4 py-2 rounded-lg">
                     <StarOutlined className="text-amber-500 text-lg mr-2" />
                     <span className="text-2xl font-bold text-gray-900">
@@ -265,7 +354,7 @@ export const UserProfile = () => {
                     </span>
                     <span className="text-gray-600 ml-1">/5.0</span>
                   </div>
-                )}
+                )} */}
               </div>
 
               <div className="mt-6 pt-6 border-t border-gray-200">
@@ -329,7 +418,7 @@ export const UserProfile = () => {
 
                 {effectiveRole === "mentor" && (
                   <>
-                    <Descriptions.Item label="Rating">
+                    {/* <Descriptions.Item label="Rating">
                       <div className="flex items-center">
                         <Rate
                           disabled
@@ -341,7 +430,7 @@ export const UserProfile = () => {
                           {currentProfile?.rating}
                         </span>
                       </div>
-                    </Descriptions.Item>
+                    </Descriptions.Item> */}
                     <Descriptions.Item label="Expertise Area">
                       <div className="flex flex-wrap gap-2">
                         {expertiseAreas.map((area, index) => (
@@ -373,7 +462,7 @@ export const UserProfile = () => {
                   <>
                     <div className="text-center p-4 bg-blue-50 rounded-lg">
                       <div className="text-3xl font-bold text-blue-600 mb-1">
-                        12
+                        {learnerStats.coursesEnrolled}
                       </div>
                       <div className="text-sm text-gray-600">
                         Courses Enrolled
@@ -381,24 +470,24 @@ export const UserProfile = () => {
                     </div>
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <div className="text-3xl font-bold text-green-600 mb-1">
-                        8
+                        {learnerStats.coursesCompleted}
                       </div>
                       <div className="text-sm text-gray-600">
                         Courses Completed
                       </div>
                     </div>
-                    <div className="text-center p-4 bg-amber-50 rounded-lg">
+                    {/* <div className="text-center p-4 bg-amber-50 rounded-lg">
                       <div className="text-3xl font-bold text-amber-600 mb-1">
-                        156
+                        {learnerStats.hoursLearned}
                       </div>
                       <div className="text-sm text-gray-600">Hours Learned</div>
-                    </div>
+                    </div> */}
                   </>
                 ) : (
                   <>
                     <div className="text-center p-4 bg-blue-50 rounded-lg">
                       <div className="text-3xl font-bold text-blue-600 mb-1">
-                        {mentorStats?.totalActiveCourses ?? 15}
+                        {mentorStats?.totalActiveCourses || 0}
                       </div>
                       <div className="text-sm text-gray-600">
                         Active Courses
@@ -406,20 +495,12 @@ export const UserProfile = () => {
                     </div>
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <div className="text-3xl font-bold text-green-600 mb-1">
-                        {mentorStats?.totalLearners ?? 2847}
+                        {mentorStats?.totalLearners || 0}
                       </div>
                       <div className="text-sm text-gray-600">
                         Total Students
                       </div>
                     </div>
-                    {/* <div className="text-center p-4 bg-amber-50 rounded-lg">
-                      <div className="text-3xl font-bold text-amber-600 mb-1">
-                        {currentProfile?.rating ?? 4.9}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Average Rating
-                      </div>
-                    </div> */}
                   </>
                 )}
               </div>

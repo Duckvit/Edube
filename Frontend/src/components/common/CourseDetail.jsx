@@ -446,7 +446,7 @@ const CourseDetail = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {userData.role === "LEARNER" && (
+            {role === "LEARNER" && (
               <Button
                 type="primary"
                 icon={<StarOutlined />}
@@ -456,7 +456,7 @@ const CourseDetail = () => {
                 Review
               </Button>
             )}
-            {course.mentorId && userData.role === "ADMIN" && (
+            {course.mentorId && role === "ADMIN" && (
               <Button
                 type="primary"
                 icon={<MessageOutlined />}
@@ -1382,7 +1382,7 @@ const CourseDetail = () => {
               </h1>
               <div className="flex items-center gap-3 mb-4">
                 <p className="text-gray-600">by {course.instructor}</p>
-                {course.mentorId && userData.role === "ADMIN" && (
+                {course.mentorId && (
                   <Button
                     type="primary"
                     icon={<MessageOutlined />}

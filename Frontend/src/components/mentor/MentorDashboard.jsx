@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Loading from "../common/Loading";
-import { BookOpen, Users, FileText, Star } from "lucide-react";
+import { statsData, activitiesData } from "../../utils/mockData";
+import { BookOpen, Users, Star, FileText } from "lucide-react";
 import { getAllActiveCoursesByMentorId } from "../../apis/CourseServices";
 import { getConversations, getMessages } from "../../apis/ChatServices";
+import { getAvgRating } from "../../apis/ReviewServices";
 import { useUserStore } from "../../store/useUserStore";
 import { toast } from "react-toastify";
 import { parseJwt } from "../../utils/jwt";
@@ -12,11 +14,12 @@ import { path } from "../../utils/path";
 export const Dashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState(null);
   const [courses, setCourses] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [totalActiveCourses, setTotalActiveCourses] = useState(0);
   const [totalLearners, setTotalLearners] = useState(0);
-  const [totalLessons, setTotalLessons] = useState(0);
-  const [averageRating, setAverageRating] = useState(0);
+  const [courseRatings, setCourseRatings] = useState({});
   const [error, setError] = useState(null);
   const [recentMessages, setRecentMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -152,6 +155,47 @@ export const Dashboard = () => {
     }
   };
 
+  // Fetch ratings for all courses
+  const fetchCourseRatings = async (coursesList) => {
+    const jwtToken = localStorage.getItem("token");
+    if (!jwtToken || !coursesList || coursesList.length === 0) {
+      return;
+    }
+
+    try {
+      const ratingPromises = coursesList.map(async (course) => {
+        try {
+          const response = await getAvgRating(course.id, jwtToken);
+          if (response?.course) {
+            return {
+              courseId: course.id,
+              averageRating: response.course.averageRating || 0,
+              totalReviews: response.course.totalReviews || 0,
+            };
+          }
+          return null;
+        } catch (err) {
+          console.error(`Error fetching rating for course ${course.id}:`, err);
+          return null;
+        }
+      });
+
+      const ratings = await Promise.all(ratingPromises);
+      const ratingsMap = {};
+      ratings.forEach((rating) => {
+        if (rating) {
+          ratingsMap[rating.courseId] = {
+            averageRating: rating.averageRating,
+            totalReviews: rating.totalReviews,
+          };
+        }
+      });
+      setCourseRatings(ratingsMap);
+    } catch (err) {
+      console.error("Error fetching course ratings:", err);
+    }
+  };
+
   useEffect(() => {
     const fetchAllActiveCourse = async () => {
       const token = localStorage.getItem("token");
@@ -174,46 +218,10 @@ export const Dashboard = () => {
         console.log("API response allActiveCourses: ", data);
         setTotalActiveCourses(data.totalActiveCourses || 0);
         setTotalLearners(data.totalLearners || 0);
-        
-        // Calculate total lessons and average rating from all courses
-        const coursesList = data?.courses || [];
-        const totalLessonsCount = coursesList.reduce((sum, course) => {
-          return sum + (course.totalLessons || 0);
-        }, 0);
-        setTotalLessons(totalLessonsCount);
-        
-        // Calculate average rating from courses
-        // Try to get rating from course.rating first, or calculate from reviews if available
-        let totalRating = 0;
-        let coursesWithRatings = 0;
-        
-        coursesList.forEach(course => {
-          let courseRating = 0;
-          
-          // First try course.rating field
-          if (course.rating && course.rating > 0) {
-            courseRating = course.rating;
-          } 
-          // If not available, try to calculate from reviews
-          else if (course.reviews && Array.isArray(course.reviews) && course.reviews.length > 0) {
-            const activeReviews = course.reviews.filter(r => r.status === 'active');
-            if (activeReviews.length > 0) {
-              const sumRating = activeReviews.reduce((sum, review) => sum + (review.rating || 0), 0);
-              courseRating = sumRating / activeReviews.length;
-            }
-          }
-          
-          if (courseRating > 0) {
-            totalRating += courseRating;
-            coursesWithRatings++;
-          }
-        });
-        
-        if (coursesWithRatings > 0) {
-          const avgRating = totalRating / coursesWithRatings;
-          setAverageRating(parseFloat(avgRating.toFixed(1)));
-        } else {
-          setAverageRating(0);
+
+        // Fetch ratings for all courses
+        if (data?.courses && data.courses.length > 0) {
+          fetchCourseRatings(data.courses);
         }
       } catch (err) {
         console.error("Lỗi khi gọi API All Courses:", err);
@@ -234,6 +242,24 @@ export const Dashboard = () => {
     }
   }, [userData]);
 
+  // Calculate average rating across all courses
+  const averageRating = React.useMemo(() => {
+    const ratings = Object.values(courseRatings).filter(
+      (r) => r.totalReviews > 0
+    );
+    if (ratings.length === 0) return 0;
+    return (
+      ratings.reduce((sum, r) => sum + r.averageRating, 0) / ratings.length
+    );
+  }, [courseRatings]);
+
+  const totalReviews = React.useMemo(() => {
+    return Object.values(courseRatings).reduce(
+      (sum, r) => sum + (r.totalReviews || 0),
+      0
+    );
+  }, [courseRatings]);
+
   return (
     <div className="bg-gray-100 rounded-lg shadow-lg m-2">
       {loading && (
@@ -243,7 +269,7 @@ export const Dashboard = () => {
       )}
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">
@@ -252,7 +278,7 @@ export const Dashboard = () => {
               <p className="text-3xl font-bold text-gray-900">
                 {totalActiveCourses}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-sm text-gray-500 mt-1">
                 Published courses
               </p>
             </div>
@@ -262,7 +288,7 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">
@@ -271,7 +297,7 @@ export const Dashboard = () => {
               <p className="text-3xl font-bold text-gray-900">
                 {totalLearners}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-sm text-gray-500 mt-1">
                 Enrolled learners
               </p>
             </div>
@@ -281,16 +307,19 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">
                 Total Lessons
               </p>
               <p className="text-3xl font-bold text-gray-900">
-                {totalLessons}
+                {courses?.courses?.reduce(
+                  (sum, course) => sum + (course.totalLessons || 0),
+                  0
+                ) || 0}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-sm text-gray-500 mt-1">
                 Across all courses
               </p>
             </div>
@@ -300,24 +329,32 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">
                 Average Rating
               </p>
               <p className="text-3xl font-bold text-gray-900">
-                {averageRating > 0 ? averageRating.toFixed(1) : "0"}
+                {averageRating > 0 ? averageRating.toFixed(1) : "0.0"}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {averageRating > 0 ? "Out of 5.0" : "No ratings yet"}
-              </p>
+              {totalReviews > 0 ? (
+                <p className="text-sm text-yellow-600 flex items-center mt-1">
+                  <Star className="w-4 h-4 mr-1 fill-current" />
+                  Based on {totalReviews} {totalReviews === 1 ? "review" : "reviews"}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500 mt-1">
+                  No ratings yet
+                </p>
+              )}
             </div>
             <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Star className="w-6 h-6 text-yellow-600 fill-yellow-600" />
+              <Star className="w-6 h-6 text-yellow-600" />
             </div>
           </div>
         </div>
+
       </div>
 
       {/* Recent Activity */}
@@ -328,28 +365,46 @@ export const Dashboard = () => {
           </h3>
           <div className="space-y-4 max-h-100 overflow-y-auto">
             {courses?.courses?.length > 0 ? (
-              courses.courses.map((item, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium text-gray-900">{item.title}</p>
-                    <p className="text-sm text-gray-600">
-                      {item.students ?? 0} students enrolled
-                    </p>
-                  </div>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      item.status === "active"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-yellow-100 text-yellow-800"
-                    }`}
+              courses.courses.map((item, index) => {
+                const rating = courseRatings[item.id];
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                   >
-                    {item.status ?? "inactive"}
-                  </span>
-                </div>
-              ))
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{item.title}</p>
+                      <div className="flex items-center gap-4 mt-1 flex-wrap">
+                        <p className="text-sm text-gray-600">
+                          {item.totalLessons ?? 0} {item.totalLessons === 1 ? "lesson" : "lessons"}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {item.totalStudents ?? 0} students enrolled
+                        </p>
+                        {rating && rating.totalReviews > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-medium text-gray-900">
+                              ⭐ {rating.averageRating.toFixed(1)}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ({rating.totalReviews} reviews)
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        item.status === "active"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {item.status ?? "inactive"}
+                    </span>
+                  </div>
+                );
+              })
             ) : (
               <p>No active courses found</p>
             )}

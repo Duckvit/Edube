@@ -1205,7 +1205,7 @@ const CourseDetail = () => {
               </h1>
               <div className="flex items-center gap-3 mb-4">
                 <p className="text-gray-600">by {course.instructor}</p>
-                {course.mentorId && userData.role === "ADMIN" && (
+                {course.mentorId && (
                   <Button
                     type="primary"
                     icon={<MessageOutlined />}

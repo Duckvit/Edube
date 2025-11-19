@@ -273,7 +273,7 @@ const CoursePreview = () => {
               </h1>
               <div className="flex items-center gap-3 mb-4">
                 <p className="text-gray-600">by {course.mentor}</p>
-                {course.mentorId && (
+                {/* {course.mentorId && (
                   <Button
                     type="primary"
                     icon={<MessageOutlined />}
@@ -315,7 +315,7 @@ const CoursePreview = () => {
                   >
                     Chat
                   </Button>
-                )}
+                )} */}
               </div>
               <div className="flex items-center space-x-6 text-sm text-gray-600">
                 {/* <div className="flex items-center">

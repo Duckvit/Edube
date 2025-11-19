@@ -313,7 +313,7 @@ const CourseDetail = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {userData.role === "LEARNER" && (
+            {role === "LEARNER" && (
               <Button
                 type="primary"
                 icon={<StarOutlined />}
@@ -323,7 +323,7 @@ const CourseDetail = () => {
                 Review
               </Button>
             )}
-            {course.mentorId && userData.role === "ADMIN" && (
+            {course.mentorId && role === "ADMIN" && (
               <Button
                 type="primary"
                 icon={<MessageOutlined />}

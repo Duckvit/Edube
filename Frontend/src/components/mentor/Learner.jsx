@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { getLearner } from "../../apis/MentorServices";
 import { useUserStore } from "../../store/useUserStore";
-import { logger } from "../../utils/logger";
 import {
   Search,
   Filter,
+  Download,
   ChevronLeft,
   ChevronRight,
   User,
@@ -22,26 +23,19 @@ export const Learner = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
-  const mentorId = userData?.mentor?.id;
-
   useEffect(() => {
     const fetchLearners = async () => {
-      if (!mentorId) {
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
         const token = localStorage.getItem("token");
-        if (!token) {
-          logger.warn("No token found");
+        const mentorId = userData?.mentor?.id;
+        if (!mentorId) {
           setLoading(false);
           return;
         }
 
         const data = await getLearner(page, size, mentorId, token);
-        logger.log("Learners data:", data);
+        console.log("📘 Learners data:", data);
 
         // Map dữ liệu đúng theo API trả về
         const mappedLearners = (data.learners || []).map((l) => ({
@@ -59,7 +53,7 @@ export const Learner = () => {
         setTotalPages(data.totalPages || 0);
         setTotalElements(data.totalElements || 0);
       } catch (err) {
-        logger.error("Error fetching learners:", err);
+        console.error("❌ Lỗi khi gọi API getLearner:", err);
         setLearners([]);
       } finally {
         setLoading(false);
@@ -67,34 +61,30 @@ export const Learner = () => {
     };
 
     fetchLearners();
-  }, [page, size, mentorId]);
+  }, [page, size, userData?.mentor?.id]);
 
-  // Memoize filtered learners
-  const filteredLearners = useMemo(() => {
-    if (!searchQuery) return learners;
-    
+  // Filter learners based on search query
+  const filteredLearners = learners.filter((learner) => {
     const query = searchQuery.toLowerCase();
-    return learners.filter((learner) => {
-      return (
-        learner.fullName.toLowerCase().includes(query) ||
-        learner.email.toLowerCase().includes(query) ||
-        learner.majorField.toLowerCase().includes(query) ||
-        learner.educationLevel.toLowerCase().includes(query)
-      );
-    });
-  }, [learners, searchQuery]);
+    return (
+      learner.fullName.toLowerCase().includes(query) ||
+      learner.email.toLowerCase().includes(query) ||
+      learner.majorField.toLowerCase().includes(query) ||
+      learner.educationLevel.toLowerCase().includes(query)
+    );
+  });
 
-  const handlePreviousPage = useCallback(() => {
+  const handlePreviousPage = () => {
     if (page > 0) {
       setPage(page - 1);
     }
-  }, [page]);
+  };
 
-  const handleNextPage = useCallback(() => {
+  const handleNextPage = () => {
     if (page < totalPages - 1) {
       setPage(page + 1);
     }
-  }, [page, totalPages]);
+  };
 
   return (
     <div className="space-y-6 p-6 bg-gray-50 min-h-screen">

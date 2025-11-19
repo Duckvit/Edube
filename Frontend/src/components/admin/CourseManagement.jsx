@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
@@ -15,17 +15,24 @@ import {
   Select,
   Button,
   Tag,
+  Dropdown,
+  Modal,
+  Rate,
 } from "antd";
 import {
   SearchOutlined,
   FilterOutlined,
   BookOutlined,
+  MoreOutlined,
+  EyeOutlined,
+  EditOutlined,
+  DeleteOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   PlayCircleOutlined,
   UserOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
-import { logger } from "../../utils/logger";
 
 const { Search } = Input;
 const { Option } = Select;
@@ -35,51 +42,73 @@ const CourseManagement = () => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const [loading, setLoading] = useState(false);
+  const [allCourses, setAllCourses] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
   const [fullCourses, setFullCourses] = useState([]);
   const navigate = useNavigate();
 
-  // Fetch all courses once on mount for filtering
+  // 🔹 Lấy toàn bộ courses 1 lần khi load trang
   useEffect(() => {
     const fetchFullCourses = async () => {
       try {
         const token = localStorage.getItem("token");
-        if (!token) {
-          toast.error("Please log in first!");
-          return;
-        }
-        const data = await getAllCourses(0, 1000, token);
+        const data = await getAllCourses(0, 1000, token); // pageSize lớn đủ chứa tất cả
         const coursesData = data?.content || [];
         setFullCourses(coursesData);
+        setFilteredCourses(coursesData);
       } catch (err) {
-        logger.error("Error fetching courses:", err);
-        toast.error("Failed to load courses");
+        console.error(err);
       }
     };
     fetchFullCourses();
   }, []);
 
-  const handleActiveCourse = useCallback(async (id) => {
+  const fetchAllCourses = async () => {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        toast.error("Please log in first!");
+        setError("Token không tồn tại");
         return;
       }
-      await activeCourse(token, id);
-      toast.success("Course activated successfully!");
-      // Update local state
-      setFullCourses((prev) =>
-        prev.map((course) =>
-          course.id === id ? { ...course, status: "active" } : course
-        )
-      );
-    } catch (err) {
-      logger.error("Error activating course:", err);
-      toast.error(err?.response?.data?.message || "Failed to activate course!");
-    }
-  }, []);
 
-  const handleDeleteCourse = useCallback(async (id) => {
+      setLoading(true);
+      const data = await getAllCourses(currentPage - 1, pageSize, token);
+      console.log("📘 API response getAllCourses:", data);
+
+      const coursesData = data?.content || [];
+      setAllCourses(coursesData);
+      setTotalItems(data?.totalElements || data?.total || 0);
+    } catch (err) {
+      console.error("Lỗi khi gọi API All Courses:", err);
+      setError(err.message || "Đã xảy ra lỗi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllCourses();
+  }, [currentPage, pageSize]);
+
+  const handleActiveCourse = async (id) => {
+    try {
+      const token = localStorage.getItem("token");
+      await activeCourse(token, id);
+      toast.success("Active Course successfully!");
+      // Refresh data after successful activation
+      const data = await getAllCourses(currentPage - 1, pageSize, token);
+      const coursesData = data?.content || [];
+      setAllCourses(coursesData);
+      setTotalItems(data?.totalElements || data?.total || 0);
+    } catch (err) {
+      console.error("Lỗi khi kích hoạt:", err);
+      toast.error("Active Course failed!");
+    }
+  };
+
+  const handleDeleteCourse = async (id) => {
     const token = localStorage.getItem("token");
     if (!token) {
       toast.error("Please log in first!");
@@ -94,55 +123,26 @@ const CourseManagement = () => {
       confirmButtonColor: "#3085d6",
       cancelButtonColor: "#d33",
       confirmButtonText: "Yes, delete it!",
-      cancelButtonText: "Cancel",
     });
 
     if (result.isConfirmed) {
       try {
-        await deleteCourse(token, id);
-        toast.success("Course deleted successfully!");
-        // Update local state
-        setFullCourses((prev) => prev.filter((course) => course.id !== id));
+        const res = await deleteCourse(token, id);
+        console.log("Delete course response:", res);
+
+        // ✅ Nếu API trả về 204, coi là thành công
+        toast.success("🗑️ Course deleted successfully!");
+        await fetchAllCourses(); // cập nhật lại danh sách
       } catch (error) {
-        logger.error("Error deleting course:", error);
+        console.error("Error deleting course:", error);
         toast.error(
-          error?.response?.data?.message || "Failed to delete course!"
+          error?.response?.data?.message || "⚠️ Something went wrong!"
         );
       }
     }
-  }, []);
+  };
 
-  // Memoize filtered data
-  const filteredData = useMemo(() => {
-    return fullCourses.filter((course) => {
-      const matchesSearch =
-        course.title?.toLowerCase().includes(searchText.toLowerCase()) ||
-        course.mentor?.user?.fullName?.toLowerCase().includes(searchText.toLowerCase()) ||
-        String(course.id).toLowerCase().includes(searchText.toLowerCase()) ||
-        course.category?.toLowerCase().includes(searchText.toLowerCase());
-
-      const matchesStatus =
-        filterStatus === "all" || course.status === filterStatus;
-      const matchesCategory =
-        filterCategory === "all" || course.category === filterCategory;
-
-      return matchesSearch && matchesStatus && matchesCategory;
-    });
-  }, [fullCourses, searchText, filterStatus, filterCategory]);
-
-  // Memoize categories
-  const categories = useMemo(() => {
-    return [...new Set(fullCourses.map((course) => course.category).filter(Boolean))];
-  }, [fullCourses]);
-
-  // Memoize status counts
-  const statusCounts = useMemo(() => ({
-    all: fullCourses.length,
-    active: fullCourses.filter((c) => c.status === "active").length,
-    inactive: fullCourses.filter((c) => c.status === "inactive").length,
-  }), [fullCourses]);
-
-  const columns = useMemo(() => [
+  const columns = [
     {
       title: "Course",
       dataIndex: "title",
@@ -287,45 +287,56 @@ const CourseManagement = () => {
         </div>
       ),
     },
-  ], [handleActiveCourse, handleDeleteCourse, navigate]);
+  ];
+
+  const filteredData = fullCourses.filter((course) => {
+    const matchesSearch =
+      course.title.toLowerCase().includes(searchText.toLowerCase()) ||
+      (course.mentor?.user?.fullName || "")
+        .toLowerCase()
+        .includes(searchText.toLowerCase()) ||
+      String(course.id).toLowerCase().includes(searchText.toLowerCase()) ||
+      (course.category || "").toLowerCase().includes(searchText.toLowerCase());
+
+    const matchesStatus =
+      filterStatus === "all" || course.status === filterStatus;
+    const matchesCategory =
+      filterCategory === "all" || course.category === filterCategory;
+
+    return matchesSearch && matchesStatus && matchesCategory;
+  });
+
+  const categories = [...new Set(fullCourses.map((course) => course.category))];
 
   return (
-    <div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Course Management
-        </h1>
-        <p className="text-gray-600">Manage and monitor all courses in the platform</p>
-      </div>
-      
+    <div className="w-full h-full bg-gray-100">
+      <h1 className="text-2xl font-bold mb-3 text-gray-800">
+        Course Management
+      </h1>
       {/* Filters and Search */}
-      <Card className="mb-6 shadow-sm border-0">
+      <Card className="w-full h-full !bg-gray-100">
         <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
           {/* Status Filter Buttons */}
           <div className="flex flex-wrap gap-2 mb-4 lg:mb-0">
             <Button
               type={filterStatus === "all" ? "primary" : "default"}
               onClick={() => setFilterStatus("all")}
-              className={`transition-all ${
-                filterStatus === "all" 
-                  ? "bg-blue-600 hover:bg-blue-700" 
-                  : "hover:bg-blue-50 border-blue-200"
+              className={`${
+                filterStatus === "all" ? "bg-blue-600" : "hover:bg-blue-50"
               }`}
             >
-              All ({statusCounts.all})
+              All ({fullCourses.length})
             </Button>
             <Button
               type={filterStatus === "active" ? "primary" : "default"}
               onClick={() =>
                 setFilterStatus(filterStatus === "active" ? "all" : "active")
               }
-              className={`transition-all ${
-                filterStatus === "active" 
-                  ? "bg-green-600 hover:bg-green-700" 
-                  : "hover:bg-green-50 border-green-200"
+              className={`${
+                filterStatus === "active" ? "bg-green-600" : "hover:bg-green-50"
               }`}
             >
-              Active ({statusCounts.active})
+              Active ({fullCourses.filter((c) => c.status === "active").length})
             </Button>
             <Button
               type={filterStatus === "inactive" ? "primary" : "default"}
@@ -334,13 +345,12 @@ const CourseManagement = () => {
                   filterStatus === "inactive" ? "all" : "inactive"
                 )
               }
-              className={`transition-all ${
-                filterStatus === "inactive" 
-                  ? "bg-orange-600 hover:bg-orange-700" 
-                  : "hover:bg-orange-50 border-orange-200"
+              className={`${
+                filterStatus === "inactive" ? "bg-red-600" : "hover:bg-red-50"
               }`}
             >
-              Inactive ({statusCounts.inactive})
+              Inactive (
+              {fullCourses.filter((c) => c.status === "inactive").length})
             </Button>
           </div>
 
@@ -376,29 +386,36 @@ const CourseManagement = () => {
       </Card>
 
       {/* Courses Table */}
-      <Card className="shadow-sm border-0">
-        <Table
-          columns={columns}
-          bordered
-          dataSource={filteredData}
-          rowKey="id"
-          onRow={(record) => ({
-            onClick: () =>
-              navigate(`/admin/course-management/course-detail/${record.id}`),
-            className: "cursor-pointer hover:bg-blue-50 transition-colors",
-          })}
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} courses`,
-            pageSizeOptions: ["10", "20", "50", "100"],
-          }}
-          scroll={{ x: "max-content", y: 600 }}
-          loading={loading}
-        />
-      </Card>
+
+      <Table
+        columns={columns}
+        bordered
+        dataSource={filteredData}
+        rowKey="id"
+        onRow={(record) => ({
+          onClick: () =>
+            navigate(`/admin/course-management/course-detail/${record.id}`),
+        })}
+        pagination={{
+          current: currentPage,
+          pageSize: pageSize,
+          total: totalItems,
+          showQuickJumper: true,
+          showSizeChanger: false,
+          pageSizeOptions: ["10", "20", "50", "100"],
+          showTotal: (total, range) =>
+            `${range[0]}-${range[1]} of ${total} courses`,
+          onChange: (page, size) => {
+            setCurrentPage(page);
+            if (size !== pageSize) {
+              setPageSize(size);
+              setCurrentPage(1); // Reset về trang 1 khi đổi page size
+            }
+          },
+        }}
+        scroll={{ x: "1600px", y: 400 }}
+        loading={loading}
+      />
     </div>
   );
 };

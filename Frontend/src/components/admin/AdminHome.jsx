@@ -12,9 +12,12 @@ import {
   ExclamationCircleOutlined,
   TeamOutlined,
   TrophyOutlined,
+  CreditCardOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
-import { BookOpen, Users, TrendingUp } from "lucide-react";
+import { BookOpen, Users, TrendingUp, CreditCard, Star } from "lucide-react";
 import { getAllCourses } from "../../apis/CourseServices";
+import { getAllReivewsByStatus } from "../../apis/ReviewServices";
 import { formatDate } from "../../utils/formatDate";
 
 export const AdminHome = () => {
@@ -30,6 +33,10 @@ export const AdminHome = () => {
     totalMentors: 0,
     totalUsers: 0,
     totalRevenue: 0,
+    totalPayments: 0,
+    totalReviews: 0,
+    activeReviews: 0,
+    inactiveReviews: 0,
   });
   
   const [allCourses, setAllCourses] = useState([]);
@@ -83,9 +90,43 @@ export const AdminHome = () => {
           return sum + revenue;
         }, 0);
 
+        // Calculate total payments (count of enrollments for paid courses)
+        const totalPayments = courses.reduce((sum, course) => {
+          // Only count enrollments for courses with price > 0
+          if ((course.price || 0) > 0) {
+            return sum + (course.totalStudents || 0);
+          }
+          return sum;
+        }, 0);
+
         // Get unique learners (this is approximate - actual count would need API)
         // For now, we'll use totalStudents as approximation
         const estimatedTotalUsers = totalMentors + totalLearners;
+
+        // Fetch reviews and categorize by status
+        let totalReviews = 0;
+        let activeReviews = 0;
+        let inactiveReviews = 0;
+        try {
+          const reviewsResponse = await getAllReivewsByStatus(token);
+          // Handle different response formats
+          const reviews = reviewsResponse?.content || reviewsResponse?.data || reviewsResponse || [];
+          if (Array.isArray(reviews)) {
+            totalReviews = reviews.length;
+            // Count active and inactive reviews
+            reviews.forEach((review) => {
+              const status = (review.status || "").toLowerCase();
+              if (status === "active" || status === "approved") {
+                activeReviews += 1;
+              } else if (status === "inactive" || status === "pending" || status === "rejected") {
+                inactiveReviews += 1;
+              }
+            });
+          }
+        } catch (reviewErr) {
+          console.error("Lỗi khi fetch reviews:", reviewErr);
+          // Continue with 0 reviews if API fails
+        }
 
         setStatistics({
           totalCourses,
@@ -95,6 +136,10 @@ export const AdminHome = () => {
           totalMentors,
           totalUsers: estimatedTotalUsers,
           totalRevenue,
+          totalPayments,
+          totalReviews,
+          activeReviews,
+          inactiveReviews,
         });
 
         // Calculate course status distribution (only active and inactive)
@@ -311,7 +356,7 @@ export const AdminHome = () => {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
         {/* Total Users Card */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
@@ -353,20 +398,58 @@ export const AdminHome = () => {
         </div>
 
         {/* Total Revenue Card */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 overflow-hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-              <p className="text-3xl font-bold text-gray-900">
+              <p className="text-2xl font-bold text-gray-900 whitespace-nowrap">
                 {new Intl.NumberFormat("vi-VN").format(statistics.totalRevenue)} VNĐ
               </p>
               <p className="text-sm text-green-600 flex items-center mt-1">
-                <DollarOutlined className="w-4 h-4 mr-1" />
+                <DollarOutlined className="w-4 h-4 mr-2" />
                 Estimated from enrollments
               </p>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
               <TrendingUp className="w-6 h-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Total Payments Card */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Payments</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {statistics.totalPayments.toLocaleString()}
+              </p>
+              <p className="text-sm text-blue-600 flex items-center mt-1">
+                <CreditCardOutlined className="w-4 h-4 mr-1" />
+                Paid enrollments
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <CreditCard className="w-6 h-6 text-indigo-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Total Reviews Card */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Reviews</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {statistics.totalReviews.toLocaleString()}
+              </p>
+              <p className="text-sm text-green-600 flex items-center mt-1 whitespace-nowrap">
+                <CheckCircleOutlined className="w-4 h-4 mr-1 flex-shrink-0" />
+                {statistics.activeReviews} active, {statistics.inactiveReviews} inactive
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+              <Star className="w-6 h-6 text-yellow-600" />
             </div>
           </div>
         </div>
@@ -463,7 +546,7 @@ export const AdminHome = () => {
       </div>
 
       {/* Recent Activities Section */}
-      <div className="mt-6">
+      {/* <div className="mt-6">
         <Card
           className="shadow-xl border-0 rounded-2xl"
           title={
@@ -495,7 +578,7 @@ export const AdminHome = () => {
             rowClassName="hover:bg-gray-50 transition-colors"
           />
         </Card>
-      </div>
+      </div> */}
     </div>
   );
 };

@@ -27,6 +27,7 @@ import {
 import { getAllActiveCoursesByMentorId } from "../../apis/CourseServices";
 import { getEnrollmentsByLearner } from "../../apis/EnrollmentServices";
 import { getLessonProgressByEnrollment } from "../../apis/LessonProgressServices";
+import { updateLearner } from "../../apis/LearnerServices";
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -238,6 +239,32 @@ export const UserProfile = () => {
 
   const handleEditSubmit = async (values) => {
     try {
+      // Only allow updating fullName and educationLevel for learner
+      const token = localStorage.getItem("token");
+      const learnerId =
+        profile?.learner?.id || profile?.id || currentProfile?.id;
+
+      if (effectiveRole === "learner") {
+        const payload = {
+          fullName: values.fullName,
+          educationLevel: values.educationLevel,
+        };
+        if (!learnerId || !token) {
+          message.error("Unable to update: missing learner id or token");
+          return;
+        }
+        await updateLearner(learnerId, payload, token);
+        // reflect change locally
+        setProfile({
+          ...profile,
+          learner: { ...currentProfile, ...payload },
+        });
+        message.success("Profile updated successfully!");
+        setIsEditModalVisible(false);
+        return;
+      }
+
+      // For other roles, keep previous behavior (no remote update implemented)
       setProfile({
         ...profile,
         [effectiveRole]: {
@@ -245,9 +272,10 @@ export const UserProfile = () => {
           ...values,
         },
       });
-      message.success("Profile updated successfully!");
+      message.success("Profile updated locally!");
       setIsEditModalVisible(false);
     } catch (error) {
+      console.error("Failed to update profile via API:", error);
       message.error("Failed to update profile");
     }
   };
@@ -499,7 +527,11 @@ export const UserProfile = () => {
             name="username"
             rules={[{ required: true, message: "Please enter your username" }]}
           >
-            <Input prefix={<UserOutlined />} placeholder="Enter username" />
+            <Input
+              prefix={<UserOutlined />}
+              placeholder="Enter username"
+              disabled
+            />
           </Form.Item>
 
           <Form.Item
@@ -518,13 +550,18 @@ export const UserProfile = () => {
               { type: "email", message: "Please enter a valid email" },
             ]}
           >
-            <Input prefix={<MailOutlined />} placeholder="Enter email" />
+            <Input
+              prefix={<MailOutlined />}
+              placeholder="Enter email"
+              disabled
+            />
           </Form.Item>
 
           <Form.Item label="Phone" name="phone">
             <Input
               prefix={<PhoneOutlined />}
               placeholder="Enter phone number"
+              disabled
             />
           </Form.Item>
 

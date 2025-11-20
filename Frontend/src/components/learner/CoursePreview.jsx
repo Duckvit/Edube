@@ -216,7 +216,8 @@ const CoursePreview = () => {
           }
         }
 
-        navigate(`/learner/course-detail/${courseId}`);
+        // After free enrollment, navigate user to Learner Dashboard -> My Learning tab
+        navigate(`/learner`, { state: { tab: "my-learning" }, replace: true });
         return;
       }
 

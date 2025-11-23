@@ -60,6 +60,9 @@ export const AdminHome = () => {
         const courses = coursesResponse?.content || [];
         setAllCourses(courses);
 
+        // Get totalElements from API response for total users
+        const totalUsersFromAPI = coursesResponse?.totalElements || 0;
+
         // Calculate statistics
         const totalCourses = courses.length;
         const statusCounts = courses.reduce(
@@ -99,10 +102,6 @@ export const AdminHome = () => {
           return sum;
         }, 0);
 
-        // Get unique learners (this is approximate - actual count would need API)
-        // For now, we'll use totalStudents as approximation
-        const estimatedTotalUsers = totalMentors + totalLearners;
-
         // Fetch reviews and categorize by status
         let totalReviews = 0;
         let activeReviews = 0;
@@ -132,9 +131,9 @@ export const AdminHome = () => {
           totalCourses,
           activeCourses,
           inactiveCourses,
-          totalLearners: Math.max(totalLearners, estimatedTotalUsers - totalMentors),
+          totalLearners: Math.max(totalLearners, totalUsersFromAPI - totalMentors),
           totalMentors,
-          totalUsers: estimatedTotalUsers,
+          totalUsers: totalUsersFromAPI,
           totalRevenue,
           totalPayments,
           totalReviews,
@@ -365,10 +364,10 @@ export const AdminHome = () => {
               <p className="text-3xl font-bold text-gray-900">
                 {statistics.totalUsers.toLocaleString()}
               </p>
-              <p className="text-sm text-gray-500 flex items-center mt-1">
+              {/* <p className="text-sm text-gray-500 flex items-center mt-1">
                 <TeamOutlined className="w-4 h-4 mr-1" />
                 {statistics.totalMentors} mentors, {statistics.totalLearners} learners
-              </p>
+              </p> */}
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <Users className="w-6 h-6 text-blue-600" />

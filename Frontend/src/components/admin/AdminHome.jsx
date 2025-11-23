@@ -18,6 +18,7 @@ import {
 import { BookOpen, Users, TrendingUp, CreditCard, Star } from "lucide-react";
 import { getAllCourses } from "../../apis/CourseServices";
 import { getAllReivewsByStatus } from "../../apis/ReviewServices";
+import { getAllMentors } from "../../apis/MentorServices";
 import { formatDate } from "../../utils/formatDate";
 
 export const AdminHome = () => {
@@ -60,8 +61,19 @@ export const AdminHome = () => {
         const courses = coursesResponse?.content || [];
         setAllCourses(courses);
 
-        // Get totalElements from API response for total users
-        const totalUsersFromAPI = coursesResponse?.totalElements || 0;
+        // Get totalElements from API response - this is the number of learners
+        const totalLearners = coursesResponse?.totalElements || 0;
+
+        // Fetch all mentors to get total mentors count
+        let totalMentors = 0;
+        try {
+          const mentorsResponse = await getAllMentors(token);
+          const mentors = mentorsResponse?.mentors || [];
+          totalMentors = mentors.length;
+        } catch (mentorErr) {
+          console.error("Lỗi khi fetch mentors:", mentorErr);
+          // Continue with 0 mentors if API fails
+        }
 
         // Calculate statistics
         const totalCourses = courses.length;
@@ -80,12 +92,8 @@ export const AdminHome = () => {
         const activeCourses = statusCounts.active;
         const inactiveCourses = statusCounts.inactive;
 
-        // Get unique mentors
-        const uniqueMentors = new Set(courses.map(c => c.mentor?.id).filter(Boolean));
-        const totalMentors = uniqueMentors.size;
-
-        // Calculate total students (sum of totalStudents from all courses)
-        const totalLearners = courses.reduce((sum, course) => sum + (course.totalStudents || 0), 0);
+        // Calculate total users: mentors + learners
+        const totalUsers = totalMentors + totalLearners;
 
         // Calculate revenue (sum of price * totalStudents, assuming all enrolled students paid)
         const totalRevenue = courses.reduce((sum, course) => {
@@ -131,9 +139,9 @@ export const AdminHome = () => {
           totalCourses,
           activeCourses,
           inactiveCourses,
-          totalLearners: Math.max(totalLearners, totalUsersFromAPI - totalMentors),
+          totalLearners,
           totalMentors,
-          totalUsers: totalUsersFromAPI,
+          totalUsers,
           totalRevenue,
           totalPayments,
           totalReviews,
@@ -364,10 +372,10 @@ export const AdminHome = () => {
               <p className="text-3xl font-bold text-gray-900">
                 {statistics.totalUsers.toLocaleString()}
               </p>
-              {/* <p className="text-sm text-gray-500 flex items-center mt-1">
+              <p className="text-sm text-gray-500 flex items-center mt-1">
                 <TeamOutlined className="w-4 h-4 mr-1" />
                 {statistics.totalMentors} mentors, {statistics.totalLearners} learners
-              </p> */}
+              </p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <Users className="w-6 h-6 text-blue-600" />
